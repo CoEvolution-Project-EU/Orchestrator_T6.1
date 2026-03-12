@@ -1,0 +1,14 @@
+
+
+{
+
+    "model": "uuid",
+    "report": "reportid",
+    "date": "03/03/2026",
+    "pool": "RP",
+    "type": "report_RAGRE",
+    "name": "nameofreport",
+    "file": "filereport.pdf",
+    "url" : "minio.example"
+
+}

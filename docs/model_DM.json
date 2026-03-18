@@ -3,12 +3,15 @@
     "name": "model name",
     "uuid": "uuid",
     "owner": "coevuser",
-    "description": " text description of model",
+    "description": {
+        "key":"text description of model"
+    },
     "date": "03/03/2026",
     "type": "modeltype1",
     "attacks": ["ids of attacks"],
     "defences": ["ids of defences run"],
     "assessment": ["ids of assessment run"],
     "reports": ["reportid", "reportid","reportid"],
-    "trusted": true
+    "trusted": true,
+    "requirements":""
 }

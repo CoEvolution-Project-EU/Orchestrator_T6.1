@@ -1,0 +1,22 @@
+{​
+  "report_id": "REP-tool_A-​4ff2dab7-20260120T184500Z-001",​
+  "report_type": "assessment_report",​
+  "timestamp_utc":​  "2026-01-20T18:45:00Z",​
+  "model_uuid":​  "4ff2dab7-bffe-414d",​
+  "tool_id": "tool_A",​
+  "has_defence": true,​​
+  "report": [​
+    {​
+      "attack_id": "ATK-001",​
+      "defence_ids": ["DEF-001"],​
+      "confidence": "medium",​
+      "severity": "medium"​
+    },​
+    {​
+      "attack_id": "ATK-002",​
+      "defence_ids": ["DEF-001"],​
+      "confidence": "high",​
+      "severity": "high"​
+    }​
+  ]​
+}​

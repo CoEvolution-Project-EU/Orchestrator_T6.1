@@ -1,0 +1,628 @@
+openapi: 3.0.3
+info:
+  title: T6.1 CoEvolution draft API
+  version: 0.1.0
+  description: |
+    Draft API specification based on the currently identified endpoints.
+
+servers:
+  - url: http://localhost:8080
+
+tags:
+  - name: UA
+  - name: Users
+  - name: Orchestrator
+  - name: Report Pool
+  - name: Trusted Resources Pool
+  - name: Resources Pool
+
+paths:
+  /api/auth/login:
+    post:
+      tags: [UA]
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+
+  /api/auth/logout:
+    post:
+      tags: [UA]
+      summary: User logout
+      responses:
+        '200':
+          description: Logout successful
+
+  /api/auth/token:
+    get:
+      tags: [UA]
+      summary: Get current auth token or session info
+      responses:
+        '200':
+          description: Token retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+
+  /api/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /api/users/roles:
+    post:
+      tags: [Users]
+      summary: Assign or update user roles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleRequest'
+      responses:
+        '200':
+          description: User roles updated successfully
+
+  /api/orchestrator/model/register:
+    post:
+      tags: [Orchestrator]
+      summary: Register model in orchestrator
+      description: Register a model lifecycle data model and return its UUID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelRegisterRequest'
+      responses:
+        '202':
+          description: Model registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UUIDResponse'
+
+  /api/orchestrator/dataset/generate:
+    post:
+      tags: [Orchestrator]
+      summary: Generate dataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetGenerateRequest'
+      responses:
+        '202':
+          description: Dataset generation started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+
+  /api/orchestrator/monitoring/start:
+    post:
+      tags: [Orchestrator]
+      summary: Start monitoring
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MonitoringStartRequest'
+      responses:
+        '202':
+          description: Monitoring started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+
+  /api/orchestrator/aimbom/generate:
+    post:
+      tags: [Orchestrator]
+      summary: Generate AIMBOM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AimbomGenerateRequest'
+      responses:
+        '202':
+          description: AIMBOM generation started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+
+  /api/orchestrator/status/{job_id}:
+    get:
+      tags: [Orchestrator]
+      summary: Get job status
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+
+  /api/reportpool/{sub_pool}:
+    post:
+      tags: [Report Pool]
+      summary: Store report
+      parameters:
+        - name: sub_pool
+          in: path
+          required: true
+          schema:
+            type: string
+            example: assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportPayload'
+      responses:
+        '201':
+          description: Report stored successfully
+
+  /api/reportpool/{model_uuid}:
+    get:
+      tags: [Report Pool]
+      summary: Get reports by model UUID
+      parameters:
+        - name: model_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Reports retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportPayload'
+
+  /api/reportpool/{model_uuid}/{sub_pool}:
+    get:
+      tags: [Report Pool]
+      summary: Get reports by model UUID and selected sub pool
+      parameters:
+        - name: model_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: sub_pool
+          in: path
+          required: true
+          schema:
+            type: string
+            example: assessment
+      responses:
+        '200':
+          description: Reports retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportPayload'
+
+  /api/resourcespool/model:
+    post:
+      tags: [Resources Pool]
+      summary: Store model (not trusted)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPayload'
+      responses:
+        '201':
+          description: Model stored successfully
+
+  /api/resourcespool/model/{model_uuid}:
+    get:
+      tags: [Resources Pool]
+      summary: Get model by UUID (not trusted)
+      parameters:
+        - name: model_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelPayload'
+
+  /api/trustedresourcespool/datasets:
+    post:
+      tags: [Trusted Resources Pool]
+      summary: Store dataset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatasetPayload'
+      responses:
+        '201':
+          description: Dataset stored successfully
+
+  /api/trustedresourcespool/datasets/{dataset_id}:
+    get:
+      tags: [Trusted Resources Pool]
+      summary: Get dataset by dataset ID
+      parameters:
+        - name: dataset_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Dataset retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatasetPayload'
+
+  /api/trustedresourcespool/model:
+    post:
+      tags: [Trusted Resources Pool]
+      summary: Store trusted model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelPayload'
+      responses:
+        '201':
+          description: Model stored successfully
+
+  /api/trustedresourcespool/model/{model_uuid}:
+    get:
+      tags: [Trusted Resources Pool]
+      summary: Get trusted model by UUID
+      parameters:
+        - name: model_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelPayload'
+
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          example: coevolution_user
+        password:
+          type: string
+          format: password
+          example: secret123
+      required:
+        - username
+        - password
+
+    AuthTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOi...
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 3600
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: user-123
+        username:
+          type: string
+          example: demo_user
+        email:
+          type: string
+          example: demo@example.com
+        roles:
+          type: array
+          items:
+            type: string
+          example: [admin, operator]
+
+    UserRoleRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+          example: user-123
+        roles:
+          type: array
+          items:
+            type: string
+          example: [admin, viewer]
+      required:
+        - user_id
+        - roles
+
+    ModelRegisterRequest:
+      $ref: '#/components/schemas/ModelPayload'
+
+    ModelPayload:
+      type: object
+      properties:
+        name:
+          type: string
+          example: model name
+        uuid:
+          type: string
+          example: 4ff2dab7-bffe-414d
+        owner:
+          type: string
+          example: coevuser
+        description:
+          type: object
+          additionalProperties:
+            type: string
+          example:
+            key: text description of model
+        date:
+          type: string
+          format: date
+          example: 2026-03-03
+        type:
+          type: string
+          example: modeltype1
+        attacks:
+          type: array
+          items:
+            type: string
+          example: [ATK-001, ATK-002]
+        defences:
+          type: array
+          items:
+            type: string
+          example: [DEF-001, DEF-002]
+        assessments:
+          type: array
+          items:
+            type: string
+          example: [ASM-001, ASM-002]
+        reports:
+          type: array
+          items:
+            type: string
+          example: [REP-001, REP-002, REP-003]
+        trusted:
+          type: boolean
+          example: true
+        requirements:
+          type: string
+          example: Must satisfy project baseline requirements
+      required:
+        - name
+        - uuid
+        - owner
+        - date
+        - type
+        - trusted
+
+    DatasetGenerateRequest:
+      type: object
+      properties:
+        model_uuid:
+          type: string
+          example: 4ff2dab7-bffe-414d
+        dataset_name:
+          type: string
+          example: synthetic-dataset-v1
+        parameters:
+          type: object
+          additionalProperties: true
+      required:
+        - model_uuid
+        - dataset_name
+
+    MonitoringStartRequest:
+      type: object
+      properties:
+        target_uuid:
+          type: string
+          example: 4ff2dab7-bffe-414d
+        mode:
+          type: string
+          example: runtime
+
+    AimbomGenerateRequest:
+      type: object
+      properties:
+        model_uuid:
+          type: string
+          example: 4ff2dab7-bffe-414d
+        dataset_id:
+          type: string
+          example: dataset-001
+        options:
+          type: object
+          additionalProperties: true
+      required:
+        - model_uuid
+
+    JobResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          example: job-789
+        status:
+          type: string
+          example: accepted
+
+    UUIDResponse:
+      type: object
+      properties:
+        uuid:
+          type: string
+          example: 4ff2dab7-bffe-414d
+        status:
+          type: string
+          example: accepted
+
+    JobStatusResponse:
+      type: object
+      properties:
+        job_id:
+          type: string
+          example: job-789
+        status:
+          type: string
+          example: running
+        progress:
+          type: integer
+          example: 60
+        result_ref:
+          type: string
+          nullable: true
+          example: report-123
+
+    AimbomPayload:
+      type: object
+      properties:
+        model_uuid:
+          type: string
+          example: 4ff2dab7-bffe-414d
+        aimbom:
+          type: object
+          additionalProperties: true
+
+    ReportEntry:
+      type: object
+      properties:
+        attack_id:
+          type: string
+          example: ATK-001
+        defence_ids:
+          type: array
+          items:
+            type: string
+          example: [DEF-001]
+        confidence:
+          type: string
+          example: medium
+        severity:
+          type: string
+          example: medium
+      required:
+        - attack_id
+        - defence_ids
+        - confidence
+        - severity
+
+    ReportPayload:
+      type: object
+      properties:
+        report_id:
+          type: string
+          example: REP-tool_A-4ff2dab7-20260120T184500Z-001
+        report_type:
+          type: string
+          example: assessment_report
+        timestamp_utc:
+          type: string
+          format: date-time
+          example: 2026-01-20T18:45:00Z
+        model_uuid:
+          type: string
+          example: 4ff2dab7-bffe-414d
+        tool_id:
+          type: string
+          example: tool_A
+        has_defence:
+          type: boolean
+          example: true
+        report:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportEntry'
+      required:
+        - report_id
+        - report_type
+        - timestamp_utc
+        - model_uuid
+        - tool_id
+        - has_defence
+        - report
+
+    DatasetPayload:
+      type: object
+      properties:
+        dataset_id:
+          type: string
+          example: dataset-001
+        name:
+          type: string
+          example: trusted-dataset
+        metadata:
+          type: object
+          additionalProperties: true
+      required:
+        - dataset_id
+        - name

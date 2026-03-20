@@ -1,10 +1,10 @@
 
 
 {  ​
-  "report_id": "REP-tool_A-​uuid",​
+  "report_id": "REP-tool_A-​4ff2dab7-20260120T184500Z-001",​
   "report_type": "assessment_report",​
   "timestamp_utc":​ "2026-01-20T18:45:00Z",​
-  "model_uuid":​ "uuid",​
+  "model_uuid":​ "4ff2dab7-bffe-414d",​
   "tool_id": "tool_A",​
   "has_defence": false,​​
   "report": [​
@@ -22,3 +22,5 @@
   ]​
 }​
 
+​
+   ​

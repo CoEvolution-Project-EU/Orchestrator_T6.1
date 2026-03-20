@@ -1,14 +1,24 @@
 
 
-{
+{  ​
+  "report_id": "REP-tool_A-​uuid",​
+  "report_type": "assessment_report",​
+  "timestamp_utc":​ "2026-01-20T18:45:00Z",​
+  "model_uuid":​ "uuid",​
+  "tool_id": "tool_A",​
+  "has_defence": false,​​
+  "report": [​
+    {​
+      "attack_id": "ATK-001",​
+      "defence_ids": [],​
+      "attack_execution_id":​  "ATK-001-RUN-0001",​
+      "attack_timestamp_utc":​  "2026-01-20T18:45:00Z",​
+      "category": "unsafe_output",​
+      "confidence": "medium",​
+      "occurrence": "systematic",​
+      "severity": "medium",​
+      "general_info": ""​
+    }​
+  ]​
+}​
 
-    "model": "uuid",
-    "report": "reportid",
-    "date": "03/03/2026",
-    "pool": "RP",
-    "type": "report_RAGRE",
-    "name": "nameofreport",
-    "file": "filereport.pdf",
-    "url" : "minio.example"
-
-}

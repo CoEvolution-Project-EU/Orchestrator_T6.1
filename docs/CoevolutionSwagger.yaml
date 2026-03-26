@@ -1,25 +1,20 @@
 openapi: 3.0.3
 info:
-  title: T6.1 CoEvolution draft API
+  title: CoEvolution Hub Components API
   version: 0.1.0
   description: |
-    Draft API specification based on the currently identified endpoints.
-
-servers:
-  - url: http://localhost:8080
+    API specification based on the currently identified endpoints.
 
 tags:
-  - name: UA
-  - name: Users
-  - name: Orchestrator
-  - name: Report Pool
-  - name: Trusted Resources Pool
-  - name: Resources Pool
+  - name: User & Credentials Management (UA)
+  - name: Orchestrator (ORCH)
+  - name: Report Pool (RP)
+  - name: Trusted Resources Pool (TRP)
 
 paths:
   /api/auth/login:
     post:
-      tags: [UA]
+      tags: [User & Credentials Management (UA)]
       summary: User login
       requestBody:
         required: true
@@ -37,7 +32,7 @@ paths:
 
   /api/auth/logout:
     post:
-      tags: [UA]
+      tags: [User & Credentials Management (UA)]
       summary: User logout
       responses:
         '200':
@@ -45,7 +40,7 @@ paths:
 
   /api/auth/token:
     get:
-      tags: [UA]
+      tags: [User & Credentials Management (UA)]
       summary: Get current auth token or session info
       responses:
         '200':
@@ -55,9 +50,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/AuthTokenResponse'
 
-  /api/users/{id}:
+  /api/auth/users/{id}:
     get:
-      tags: [Users]
+      tags: [User & Credentials Management (UA)]
       summary: Get user by ID
       parameters:
         - name: id
@@ -73,9 +68,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/User'
 
-  /api/users/roles:
+  /api/auth/users/roles:
     post:
-      tags: [Users]
+      tags: [User & Credentials Management (UA)]
       summary: Assign or update user roles
       requestBody:
         required: true
@@ -89,7 +84,7 @@ paths:
 
   /api/orchestrator/model/register:
     post:
-      tags: [Orchestrator]
+      tags: [Orchestrator (ORCH)]
       summary: Register model in orchestrator
       description: Register a model lifecycle data model and return its UUID.
       requestBody:
@@ -108,7 +103,7 @@ paths:
 
   /api/orchestrator/dataset/generate:
     post:
-      tags: [Orchestrator]
+      tags: [Orchestrator (ORCH)]
       summary: Generate dataset
       requestBody:
         required: true
@@ -126,7 +121,7 @@ paths:
 
   /api/orchestrator/monitoring/start:
     post:
-      tags: [Orchestrator]
+      tags: [Orchestrator (ORCH)]
       summary: Start monitoring
       requestBody:
         required: false
@@ -144,7 +139,7 @@ paths:
 
   /api/orchestrator/aimbom/generate:
     post:
-      tags: [Orchestrator]
+      tags: [Orchestrator (ORCH)]
       summary: Generate AIMBOM
       requestBody:
         required: true
@@ -162,7 +157,7 @@ paths:
 
   /api/orchestrator/status/{job_id}:
     get:
-      tags: [Orchestrator]
+      tags: [Orchestrator (ORCH)]
       summary: Get job status
       parameters:
         - name: job_id
@@ -180,7 +175,7 @@ paths:
 
   /api/reportpool/{sub_pool}:
     post:
-      tags: [Report Pool]
+      tags: [Report Pool (RP)]
       summary: Store report
       parameters:
         - name: sub_pool
@@ -201,7 +196,7 @@ paths:
 
   /api/reportpool/{model_uuid}:
     get:
-      tags: [Report Pool]
+      tags: [Report Pool (RP)]
       summary: Get reports by model UUID
       parameters:
         - name: model_uuid
@@ -221,7 +216,7 @@ paths:
 
   /api/reportpool/{model_uuid}/{sub_pool}:
     get:
-      tags: [Report Pool]
+      tags: [Report Pool (RP)]
       summary: Get reports by model UUID and selected sub pool
       parameters:
         - name: model_uuid
@@ -245,41 +240,9 @@ paths:
                 items:
                   $ref: '#/components/schemas/ReportPayload'
 
-  /api/resourcespool/model:
-    post:
-      tags: [Resources Pool]
-      summary: Store model (not trusted)
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ModelPayload'
-      responses:
-        '201':
-          description: Model stored successfully
-
-  /api/resourcespool/model/{model_uuid}:
-    get:
-      tags: [Resources Pool]
-      summary: Get model by UUID (not trusted)
-      parameters:
-        - name: model_uuid
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Model retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModelPayload'
-
   /api/trustedresourcespool/datasets:
     post:
-      tags: [Trusted Resources Pool]
+      tags: [Trusted Resources Pool (TRP)]
       summary: Store dataset
       requestBody:
         required: true
@@ -293,7 +256,7 @@ paths:
 
   /api/trustedresourcespool/datasets/{dataset_id}:
     get:
-      tags: [Trusted Resources Pool]
+      tags: [Trusted Resources Pool (TRP)]
       summary: Get dataset by dataset ID
       parameters:
         - name: dataset_id
@@ -311,7 +274,7 @@ paths:
 
   /api/trustedresourcespool/model:
     post:
-      tags: [Trusted Resources Pool]
+      tags: [Trusted Resources Pool (TRP)]
       summary: Store trusted model
       requestBody:
         required: true
@@ -325,7 +288,7 @@ paths:
 
   /api/trustedresourcespool/model/{model_uuid}:
     get:
-      tags: [Trusted Resources Pool]
+      tags: [Trusted Resources Pool (TRP)]
       summary: Get trusted model by UUID
       parameters:
         - name: model_uuid

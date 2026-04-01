@@ -14,7 +14,6 @@ tags:
   - name: Assessment Pool (AP) (SLC)
   - name: Security Trust Robustness Defence Pool (STRDP) (UNICA)
 
-
 paths:
   /api/auth/login:
     post:

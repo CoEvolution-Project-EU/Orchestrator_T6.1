@@ -6,15 +6,19 @@ info:
     API specification based on the currently identified endpoints.
 
 tags:
-  - name: User & Credentials Management (UA)
-  - name: Orchestrator (ORCH)
-  - name: Report Pool (RP)
-  - name: Trusted Resources Pool (TRP)
+  - name: User & Credentials Management (UA) (AEGIS)
+  - name: Orchestrator (ORCH) (AEGIS)
+  - name: Report Pool (RP) (AEGIS)
+  - name: Trusted Resources Pool (TRP) (AEGIS)
+  - name: Security Assurance Pool (SAP) (CBRL)
+  - name: Assessment Pool (AP) (SLC)
+  - name: Security Trust Robustness Defence Pool (STRDP) (UNICA)
+
 
 paths:
   /api/auth/login:
     post:
-      tags: [User & Credentials Management (UA)]
+      tags: [User & Credentials Management (UA) (AEGIS)]
       summary: User login
       requestBody:
         required: true
@@ -32,7 +36,7 @@ paths:
 
   /api/auth/logout:
     post:
-      tags: [User & Credentials Management (UA)]
+      tags: [User & Credentials Management (UA) (AEGIS)]
       summary: User logout
       responses:
         '200':
@@ -40,7 +44,7 @@ paths:
 
   /api/auth/token:
     get:
-      tags: [User & Credentials Management (UA)]
+      tags: [User & Credentials Management (UA) (AEGIS)]
       summary: Get current auth token or session info
       responses:
         '200':
@@ -52,7 +56,7 @@ paths:
 
   /api/auth/users/{id}:
     get:
-      tags: [User & Credentials Management (UA)]
+      tags: [User & Credentials Management (UA) (AEGIS)]
       summary: Get user by ID
       parameters:
         - name: id
@@ -70,7 +74,7 @@ paths:
 
   /api/auth/users/roles:
     post:
-      tags: [User & Credentials Management (UA)]
+      tags: [User & Credentials Management (UA) (AEGIS)]
       summary: Assign or update user roles
       requestBody:
         required: true
@@ -84,7 +88,7 @@ paths:
 
   /api/orchestrator/model/register:
     post:
-      tags: [Orchestrator (ORCH)]
+      tags: [Orchestrator (ORCH) (AEGIS)]
       summary: Register model in orchestrator
       description: Register a model lifecycle data model and return its UUID.
       requestBody:
@@ -103,7 +107,7 @@ paths:
 
   /api/orchestrator/dataset/generate:
     post:
-      tags: [Orchestrator (ORCH)]
+      tags: [Orchestrator (ORCH) (AEGIS)]
       summary: Generate dataset
       requestBody:
         required: true
@@ -121,7 +125,7 @@ paths:
 
   /api/orchestrator/monitoring/start:
     post:
-      tags: [Orchestrator (ORCH)]
+      tags: [Orchestrator (ORCH) (AEGIS)]
       summary: Start monitoring
       requestBody:
         required: false
@@ -139,7 +143,7 @@ paths:
 
   /api/orchestrator/aimbom/generate:
     post:
-      tags: [Orchestrator (ORCH)]
+      tags: [Orchestrator (ORCH) (AEGIS)]
       summary: Generate AIMBOM
       requestBody:
         required: true
@@ -157,7 +161,7 @@ paths:
 
   /api/orchestrator/status/{job_id}:
     get:
-      tags: [Orchestrator (ORCH)]
+      tags: [Orchestrator (ORCH) (AEGIS)]
       summary: Get job status
       parameters:
         - name: job_id
@@ -175,7 +179,7 @@ paths:
 
   /api/reportpool/{sub_pool}:
     post:
-      tags: [Report Pool (RP)]
+      tags: [Report Pool (RP) (AEGIS)]
       summary: Store report
       parameters:
         - name: sub_pool
@@ -196,7 +200,7 @@ paths:
 
   /api/reportpool/{model_uuid}:
     get:
-      tags: [Report Pool (RP)]
+      tags: [Report Pool (RP) (AEGIS)]
       summary: Get reports by model UUID
       parameters:
         - name: model_uuid
@@ -216,7 +220,7 @@ paths:
 
   /api/reportpool/{model_uuid}/{sub_pool}:
     get:
-      tags: [Report Pool (RP)]
+      tags: [Report Pool (RP) (AEGIS)]
       summary: Get reports by model UUID and selected sub pool
       parameters:
         - name: model_uuid
@@ -242,7 +246,7 @@ paths:
 
   /api/trustedresourcespool/datasets:
     post:
-      tags: [Trusted Resources Pool (TRP)]
+      tags: [Trusted Resources Pool (TRP) (AEGIS)]
       summary: Store dataset
       requestBody:
         required: true
@@ -256,7 +260,7 @@ paths:
 
   /api/trustedresourcespool/datasets/{dataset_id}:
     get:
-      tags: [Trusted Resources Pool (TRP)]
+      tags: [Trusted Resources Pool (TRP) (AEGIS)]
       summary: Get dataset by dataset ID
       parameters:
         - name: dataset_id
@@ -274,7 +278,7 @@ paths:
 
   /api/trustedresourcespool/model:
     post:
-      tags: [Trusted Resources Pool (TRP)]
+      tags: [Trusted Resources Pool (TRP) (AEGIS)]
       summary: Store trusted model
       requestBody:
         required: true
@@ -288,7 +292,7 @@ paths:
 
   /api/trustedresourcespool/model/{model_uuid}:
     get:
-      tags: [Trusted Resources Pool (TRP)]
+      tags: [Trusted Resources Pool (TRP) (AEGIS)]
       summary: Get trusted model by UUID
       parameters:
         - name: model_uuid
@@ -303,6 +307,130 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ModelPayload'
+
+ 
+  /api/securityassurancepool/{sub_pool}:
+    post:
+      tags: [Security Assurance Pool (SAP) (CBRL)]
+      summary: Store ??
+      parameters:
+        - name: sub_pool
+          in: path
+          required: true
+          schema:
+            type: string
+            example: assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportPayload'
+      responses:
+        '201':
+          description: ?? stored successfully
+
+  /api/securityassurancepool/{model_uuid}:
+    get:
+      tags: [Security Assurance Pool (SAP) (CBRL)]
+      summary: Get ??
+      parameters:
+        - name: model_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ?? retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportPayload'
+
+  /api/assessmentpool/{sub_pool}:
+    post:
+      tags: [Assessment Pool (AP) (SLC)]
+      summary: Store ??
+      parameters:
+        - name: sub_pool
+          in: path
+          required: true
+          schema:
+            type: string
+            example: assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportPayload'
+      responses:
+        '201':
+          description: ?? stored successfully
+
+  /api/assessmentpool/{model_uuid}:
+    get:
+      tags: [Assessment Pool (AP) (SLC)]
+      summary: Get ?? by model UUID
+      parameters:
+        - name: model_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ?? retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportPayload'
+
+  /api/strdppool/{sub_pool}:
+    post:
+      tags: [Security Trust Robustness Defence Pool (STRDP) (UNICA)]
+      summary: Store ??
+      parameters:
+        - name: sub_pool
+          in: path
+          required: true
+          schema:
+            type: string
+            example: assessment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportPayload'
+      responses:
+        '201':
+          description: ?? stored successfully
+
+  /api/strdppool/{model_uuid}:
+    get:
+      tags: [Security Trust Robustness Defence Pool (STRDP) (UNICA)]
+      summary: Get ?? by model UUID
+      parameters:
+        - name: model_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ?? retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReportPayload'
 
 components:
   schemas:
@@ -375,7 +503,7 @@ components:
         name:
           type: string
           example: model name
-        uuid:
+        model_uuid:
           type: string
           example: 4ff2dab7-bffe-414d
         owner:
@@ -422,7 +550,7 @@ components:
           example: Must satisfy project baseline requirements
       required:
         - name
-        - uuid
+        - model_uuid
         - owner
         - date
         - type
@@ -482,7 +610,7 @@ components:
     UUIDResponse:
       type: object
       properties:
-        uuid:
+        model_uuid:
           type: string
           example: 4ff2dab7-bffe-414d
         status:

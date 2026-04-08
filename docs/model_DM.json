@@ -1,17 +1,34 @@
-
-{ 
-    "name": "model name",
-    "uuid": "uuid",
-    "owner": "coevuser",
-    "description": {
-        "key":"text description of model"
-    },
-    "date": "03/03/2026",
-    "type": "modeltype1",
-    "attacks": ["ids of attacks"],
-    "defences": ["ids of defences run"],
-    "assessment": ["ids of assessment run"],
-    "reports": ["reportid", "reportid","reportid"],
-    "trusted": true,
-    "requirements":""
+{
+  "name": "string", // by user
+  "model_uuid": "string", //uuid by orch
+  "owner": "string", //keycloak username registration by ui
+  "type": "string", //dropdown by user
+  "versioning":[
+    {
+    "version":"v1.0", // for MVP by user, then updated by orch
+    "timestamp": "timestamp",  //utc by orch
+    "requirements_file": "file", // uploaded by user
+    "requirements_url": "string", // updated by orch with file bucket url once file is saved in MinIO
+    "description": "description text by user", //string
+    "trusted": false,
+    //below information is related to the reports and attacks, continuously updated by the orch 
+    "attacks": [
+       "ATK-001",
+       "ATK-002"
+     ],
+    "defences": [
+      "DEF-001",
+      "DEF-002"
+     ],
+    "assessments": [
+      "ASM-001",
+      "ASM-002"
+     ],
+    "risk_assessment_reports": [
+      "REP-001",
+      "REP-002",
+      "REP-003"
+    ]
+    }
+]
 }

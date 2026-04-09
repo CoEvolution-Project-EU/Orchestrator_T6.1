@@ -7,9 +7,10 @@ import { initMinIO } from './config/minio.js'
 
 
 //Read my .env file and load variables so you can see process.env.PORT, process.env.MONGODB_URI
-dotenv.config({
-    path: './.env'
-});
+// Only load .env file in development, not in production/kubernetes
+if (process.env.NODE_ENV !== 'production') {
+    dotenv.config({ path: './.env' })
+  }
 
 //You create a function that will: connect to DB, start server
 const startServer = async () => {

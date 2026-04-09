@@ -8,7 +8,7 @@ import jwksClient from 'jwks-rsa'
 
 // Keycloak JWKS endpoint — provides public keys to verify JWT signatures
 const client = jwksClient({
-    jwksUri: 'http://147.102.19.168:30012/realms/coevolution/protocol/openid-connect/certs',
+    jwksUri: 'https://aegis.coevolution-project.eu/realms/coevolution/protocol/openid-connect/certs',
     cache: true,
   rateLimit: true,
 })
@@ -36,7 +36,7 @@ export const requireAuth = (req, res, next) => {
     token,
     getKey,
     {
-      issuer:   'http://localhost:30012/realms/coevolution',
+      issuer:   'https://aegis.coevolution-project.eu/realms/coevolution',
       audience: 'account',
     },
     (err, decoded) => {

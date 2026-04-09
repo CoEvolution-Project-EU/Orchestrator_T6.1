@@ -1,0 +1,38 @@
+{
+  "name": "orchestrator_t6.1",
+  "version": "1.0.0",
+  "description": "backend of coevolution",
+  "homepage": "https://github.com/CoEvolution-Project-EU/Orchestrator_T6.1#readme",
+  "bugs": {
+    "url": "https://github.com/CoEvolution-Project-EU/Orchestrator_T6.1/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CoEvolution-Project-EU/Orchestrator_T6.1.git"
+  },
+  "license": "ISC",
+  "author": "konstantinos_kr",
+  "main": "index.js",
+  "type": "module",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "start": "node backend/src/index.js",
+    "dev": "nodemon backend/src/index.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "jsonwebtoken": "^9.0.3",
+    "jwks-rsa": "^4.0.1",
+    "keycloak-connect": "^26.1.1",
+    "minio": "^8.0.7",
+    "mongoose": "^9.3.3",
+    "multer": "^2.1.1",
+    "nodemon": "^3.1.14",
+    "uuid": "^13.0.0"
+  }
+}

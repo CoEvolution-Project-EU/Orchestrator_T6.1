@@ -81,7 +81,7 @@ const uploadRequirements = async (req, res) => {
   
       // Save filename and URL to MongoDB
       v.requirements_file = file.originalname
-      v.requirements_url  = `http://147.102.19.168:30007/trusted-data/${objectKey}`
+      v.requirements_url = `https://aegis.coevolution-project.eu/api/v1/files/download/${doc._id}`
       await model.save()
   
       res.status(200).json({

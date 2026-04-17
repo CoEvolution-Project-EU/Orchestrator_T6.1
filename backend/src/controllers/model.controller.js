@@ -106,7 +106,8 @@ const uploadRequirements = async (req, res) => {
     // Update model versioning with file info
     v.requirements_file = file.originalname
     // When uploading — encode pool and bucket in the URL
-    v.requirements_url = `https://aegis.coevolution-project.eu/api/v1/models/${uuid}/versions/${version}/requirements/download?pool=${pool}&bucket=${bucket}`    await model.save()
+    v.requirements_url = `https://aegis.coevolution-project.eu/api/v1/models/${uuid}/versions/${version}/requirements/download?pool=${pool}&bucket=${bucket}`   
+    await model.save()
 
     res.status(200).json({
       message:           'Requirements file uploaded',

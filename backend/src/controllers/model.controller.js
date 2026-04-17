@@ -2,6 +2,8 @@
 import { Model } from '../models/models.model.js';
 import { getPool } from '../config/minio.js'
 
+
+
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
   try {
@@ -73,9 +75,12 @@ const addVersion = async (req, res) => {
 const uploadRequirements = async (req, res) => {
   try {
     const { uuid, version } = req.params
+    const { pool, bucket } = req.body    // ← get from request body
     const file = req.file
 
-    if (!file) return res.status(400).json({ message: 'File is required' })
+    if (!file)   return res.status(400).json({ message: 'File is required' })
+    if (!pool)   return res.status(400).json({ message: 'pool is required' })
+    if (!bucket) return res.status(400).json({ message: 'bucket is required' })
 
     const model = await Model.findOne({ model_uuid: uuid })
     if (!model) return res.status(404).json({ message: 'Model not found' })
@@ -83,21 +88,26 @@ const uploadRequirements = async (req, res) => {
     const v = model.versioning.find(v => v.version === version)
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    // Build object key
     const objectKey   = `${uuid}-${version}-${file.originalname}`
-    const minioClient = getPool('TRP')
+    const minioClient = getPool(pool)    // ← dynamic pool
+    if (!minioClient) return res.status(400).json({ message: `Unknown pool: ${pool}` })
+
+    // Make sure bucket exists
+    const exists = await minioClient.bucketExists(bucket)
+    if (!exists) await minioClient.makeBucket(bucket)
 
     await minioClient.putObject(
-      'trusted-data',
+      bucket,                            // ← dynamic bucket
       objectKey,
       file.buffer,
       file.size,
-      { 'Content-Type': file.mimetype || 'text/plain' }
+      { 'Content-Type': file.mimetype || 'application/octet-stream' }
     )
 
-    // URL goes through backend API — no IP exposure
     v.requirements_file = file.originalname
     v.requirements_url  = `https://aegis.coevolution-project.eu/api/v1/models/${uuid}/versions/${version}/requirements/download`
+    v.requirements_pool   = pool      // ← add this
+    v.requirements_bucket = bucket    // ← add this
     await model.save()
 
     res.status(200).json({
@@ -105,6 +115,8 @@ const uploadRequirements = async (req, res) => {
       requirements_file: v.requirements_file,
       requirements_url:  v.requirements_url,
       object_key:        objectKey,
+      pool,
+      bucket,
     })
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
@@ -121,15 +133,17 @@ const downloadRequirements = async (req, res) => {
     if (!model) return res.status(404).json({ message: 'Model not found' })
 
     const v = model.versioning.find(v => v.version === version)
-    if (!v) return res.status(404).json({ message: 'Version not found' })
-    if (!v.requirements_file) return res.status(404).json({ message: 'No requirements file' })
+    if (!v)                    return res.status(404).json({ message: 'Version not found' })
+    if (!v.requirements_file)  return res.status(404).json({ message: 'No requirements file' })
 
     const objectKey   = `${uuid}-${version}-${v.requirements_file}`
-    const minioClient = getPool('TRP')
-    const stream      = await minioClient.getObject('trusted-data', objectKey)
+    const pool        = v.requirements_pool   || 'TRP'          // fallback for old records
+    const bucket      = v.requirements_bucket || 'trusted-data' // fallback for old records
+    const minioClient = getPool(pool)
+    const stream      = await minioClient.getObject(bucket, objectKey)
 
     res.setHeader('Content-Disposition', `attachment; filename="${v.requirements_file}"`)
-    res.setHeader('Content-Type', 'text/plain')
+    res.setHeader('Content-Type', 'application/octet-stream')
     stream.pipe(res)
   } catch (error) {
     res.status(500).json({ message: 'Download failed', error: error.message })

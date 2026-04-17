@@ -63,7 +63,7 @@ const downloadFile = async (req, res) => {
     const doc = await File.findById(req.params.id)
     if (!doc) return res.status(404).json({ message: 'File not found' })
 
-    const client = minioPools[doc.pool]
+    const client = getPool(doc.pool)    // ← fix: was minioPools[doc.pool]
     const stream = await client.getObject(doc.bucket, doc.objectKey)
 
     res.setHeader('Content-Type', doc.contentType)
@@ -81,8 +81,7 @@ const getPresignedUrl = async (req, res) => {
     const doc = await File.findById(req.params.id)
     if (!doc) return res.status(404).json({ message: 'File not found' })
 
-    const client = minioPools[doc.pool]
-    // URL valid for 1 hour
+    const client = getPool(doc.pool)    // ← fix: was minioPools[doc.pool]
     const url = await client.presignedGetObject(doc.bucket, doc.objectKey, 3600)
 
     res.status(200).json({ url, expiresIn: '1 hour' })
@@ -139,13 +138,10 @@ const deleteFile = async (req, res) => {
     const doc = await File.findById(req.params.id)
     if (!doc) return res.status(404).json({ message: 'File not found' })
 
-    // Delete from MinIO
-    const client = minioPools[doc.pool]
+    const client = getPool(doc.pool)    // ← fix: was minioPools[doc.pool]
     await client.removeObject(doc.bucket, doc.objectKey)
 
-    // Delete from MongoDB
     await File.findByIdAndDelete(req.params.id)
-
     res.status(200).json({ message: 'File deleted successfully' })
   } catch (error) {
     res.status(500).json({ message: 'Delete failed', error: error.message })

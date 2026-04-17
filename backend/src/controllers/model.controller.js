@@ -56,43 +56,41 @@ const getAllModels = async (req, res) => {
 // POST /api/v1/models/:uuid/versions/:version/requirements
 // Body: multipart/form-data with field "file"
 const uploadRequirements = async (req, res) => {
-    try {
-      const { uuid, version } = req.params
-      const file = req.file   // from multer
-  
-      if (!file) return res.status(400).json({ message: 'File is required' })
-  
-      const model = await Model.findOne({ model_uuid: uuid })
-      if (!model) return res.status(404).json({ message: 'Model not found' })
-  
-      const v = model.versioning.find(v => v.version === version)
-      if (!v) return res.status(404).json({ message: 'Version not found' })
-  
-      // Upload to MinIO TRP pool, trusted-data bucket
-      const objectKey = `${uuid}-${version}-${file.originalname}`
-      const minioClient = getPool('TRP')
-      await minioClient.putObject(
-        'trusted-data',
-        objectKey,
-        file.buffer,
-        file.size,
-        { 'Content-Type': 'text/plain' }
-      )
-  
-      // Save filename and URL to MongoDB
-      v.requirements_file = file.originalname
-      v.requirements_url = `https://aegis.coevolution-project.eu/api/v1/files/download/${doc._id}`
-      await model.save()
-  
-      res.status(200).json({
-        message: 'Requirements file uploaded',
-        requirements_file: v.requirements_file,
-        requirements_url:  v.requirements_url,
-      })
-    } catch (error) {
-      res.status(500).json({ message: 'Server error', error: error.message })
-    }
+  try {
+    const { uuid, version } = req.params
+    const file = req.file
+
+    if (!file) return res.status(400).json({ message: 'File is required' })
+
+    const model = await Model.findOne({ model_uuid: uuid })
+    if (!model) return res.status(404).json({ message: 'Model not found' })
+
+    const v = model.versioning.find(v => v.version === version)
+    if (!v) return res.status(404).json({ message: 'Version not found' })
+
+    const objectKey = `${uuid}-${version}-${file.originalname}`
+    const minioClient = getPool('TRP')
+    await minioClient.putObject(
+      'trusted-data',
+      objectKey,
+      file.buffer,
+      file.size,
+      { 'Content-Type': 'text/plain' }
+    )
+
+    v.requirements_file = file.originalname
+    v.requirements_url  = `http://147.102.19.168:30007/trusted-data/${objectKey}`
+    await model.save()
+
+    res.status(200).json({
+      message:           'Requirements file uploaded',
+      requirements_file: v.requirements_file,
+      requirements_url:  v.requirements_url,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
   }
+}
 
 
 // ── Update requirements URL (orchestrator) ────────────────────

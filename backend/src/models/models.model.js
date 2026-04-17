@@ -9,12 +9,7 @@ const versioningSchema = new Schema(
         type: String,
         required: true,
       },
-      requirements_pool: {       // ← add here
-        type: String,
-      },
-      requirements_bucket: {     // ← add here
-        type: String,
-      },
+      
       requirements_file: {
         type: String,              // original filename uploaded by user
       },

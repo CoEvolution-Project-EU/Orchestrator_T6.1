@@ -1,6 +1,7 @@
 // src/controllers/model.controller.js
 import { Model } from '../models/models.model.js';
 import { getPool } from '../config/minio.js'
+import { File } from '../models/file.model.js' 
 
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
@@ -92,8 +93,9 @@ const uploadRequirements = async (req, res) => {
 
     // Make sure bucket exists
     const exists = await minioClient.bucketExists(bucket)
-    if (!exists) await minioClient.makeBucket(bucket)
-
+    if (!exists) return res.status(404).json({ 
+      message: `Bucket "${bucket}" does not exist in pool "${pool}"` 
+    })
     // Upload to whichever pool/bucket the user passed
     await minioClient.putObject(
       bucket,
@@ -103,6 +105,19 @@ const uploadRequirements = async (req, res) => {
       { 'Content-Type': file.mimetype || 'application/octet-stream' }
     )
 
+        // Save to files collection in MongoDB ← add this block
+    await File.create({
+      pool,
+      bucket,
+      objectKey,
+      filename:    file.originalname,
+      size:        file.size,
+      contentType: file.mimetype || 'application/octet-stream',
+      modelName:   model.name,           // link to the model name
+      uploadedBy:  req.user?.username || 'backend',
+      tags:        [`model:${uuid}`, `version:${version}`],  // tag with model and version
+    })
+    
     // Update model versioning with file info
     v.requirements_file = file.originalname
     // When uploading — encode pool and bucket in the URL

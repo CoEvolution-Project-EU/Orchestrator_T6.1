@@ -47,6 +47,7 @@ export function getPool(poolName) {
   return map[poolName]?.()
 }
 
+//create bucket if it doesnt exist for each pool
 export async function initMinIO() {
   const buckets = {
     SAP:   [],

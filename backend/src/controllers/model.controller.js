@@ -136,10 +136,10 @@ const uploadRequirements = async (req, res) => {
 
         // Notify partner via Kafka
     await producer.send({
-      topic: 'requirements-uploaded',
+      topic: 'ragre_models',
       messages: [{
         value: JSON.stringify({
-          event:            'requirements-uploaded',
+          event:            'ragre_models',
           modelName:        model.name,
           modelUuid:        uuid,
           owner:            model.owner,
@@ -153,7 +153,7 @@ const uploadRequirements = async (req, res) => {
       }]
     })
 
-    console.log(`[Kafka] Event published: requirements-uploaded for model ${model.name}`)
+    console.log(`[Kafka] Event published: ragre_models for model ${model.name}`)
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }

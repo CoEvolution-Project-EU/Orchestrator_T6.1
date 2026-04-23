@@ -2,6 +2,7 @@
 import { Model } from '../models/models.model.js';
 import { getPool } from '../config/minio.js'
 import { File } from '../models/file.model.js' 
+import { producer } from '../config/kafka.js'
 
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
@@ -117,7 +118,7 @@ const uploadRequirements = async (req, res) => {
       uploadedBy:  req.user?.username || 'backend',
       tags:        [`model:${uuid}`, `version:${version}`],  // tag with model and version
     })
-    
+
     // Update model versioning with file info
     v.requirements_file = file.originalname
     // When uploading — encode pool and bucket in the URL
@@ -132,6 +133,27 @@ const uploadRequirements = async (req, res) => {
       pool,
       bucket,
     })
+
+        // Notify partner via Kafka
+    await producer.send({
+      topic: 'requirements-uploaded',
+      messages: [{
+        value: JSON.stringify({
+          event:            'requirements-uploaded',
+          modelName:        model.name,
+          modelUuid:        uuid,
+          owner:            model.owner,
+          version:          version,
+          requirements_file: file.originalname,
+          requirements_url:  v.requirements_url,
+          pool:             pool,
+          bucket:           bucket,
+          uploadedAt:       new Date().toISOString(),
+        })
+      }]
+    })
+
+    console.log(`[Kafka] Event published: requirements-uploaded for model ${model.name}`)
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }

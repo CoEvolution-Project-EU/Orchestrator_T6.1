@@ -6,7 +6,7 @@ const kafka = new Kafka({
   brokers: [process.env.KAFKA_BROKER || '147.102.19.168:30004'],
 })
 
-const producer = kafka.producer()
+export const producer = kafka.producer()
 
 export async function initKafka() {
     try {
@@ -17,3 +17,4 @@ export async function initKafka() {
       // don't crash the server if Kafka is unavailable
     }
   }
+

@@ -135,8 +135,8 @@ const uploadRequirements = async (req, res) => {
     })
 
         // Notify partner via Kafka
-    await publishEvent('requirements-uploaded', {
-      event:             'requirements-uploaded',
+    await publishEvent('ragre_models', {
+      event:             'ragre_models',
       modelName:         model.name,
       modelUuid:         uuid,
       owner:             model.owner,

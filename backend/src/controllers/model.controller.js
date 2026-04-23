@@ -2,7 +2,7 @@
 import { Model } from '../models/models.model.js';
 import { getPool } from '../config/minio.js'
 import { File } from '../models/file.model.js' 
-import { producer } from '../config/kafka.js'
+import { producer,publishEvent } from '../config/kafka.js'
 
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
@@ -135,22 +135,17 @@ const uploadRequirements = async (req, res) => {
     })
 
         // Notify partner via Kafka
-    await producer.send({
-      topic: 'ragre_models',
-      messages: [{
-        value: JSON.stringify({
-          event:            'ragre_models',
-          modelName:        model.name,
-          modelUuid:        uuid,
-          owner:            model.owner,
-          version:          version,
-          requirements_file: file.originalname,
-          requirements_url:  v.requirements_url,
-          pool:             pool,
-          bucket:           bucket,
-          uploadedAt:       new Date().toISOString(),
-        })
-      }]
+    await publishEvent('requirements-uploaded', {
+      event:             'requirements-uploaded',
+      modelName:         model.name,
+      modelUuid:         uuid,
+      owner:             model.owner,
+      version:           version,
+      requirements_file: file.originalname,
+      requirements_url:  v.requirements_url,
+      pool,
+      bucket,
+      uploadedAt:        new Date().toISOString(),
     })
 
     console.log(`[Kafka] Event published: ragre_models for model ${model.name}`)

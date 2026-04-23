@@ -24,7 +24,7 @@ const fileSchema = new Schema(
     version: {
       type:     String,
       required: true,   // which version of the model
-      index:    true,
+      index:    true, 
     },
     objectKey: {
       type:     String,

@@ -50,11 +50,11 @@ export function getPool(poolName) {
 //create bucket if it doesnt exist for each pool
 export async function initMinIO() {
   const buckets = {
-    SAP:   [],
-    RP:    [],
+    SAP:   ['ai-mbom'],
+    RP:    ['risk-reports','assessment-reports','defence-reports'],
     TRP:   ['trusted-data', 'trusted-models'],
-    AP:    [],
-    STRDP: [],
+    AP:    ['assessment-libraries','assessment-tools'],
+    STRDP: ['defence-libraries','design-train-defence-tools','deployment-test-defence-tools'],
   }
 
   for (const [pool, bucketList] of Object.entries(buckets)) {

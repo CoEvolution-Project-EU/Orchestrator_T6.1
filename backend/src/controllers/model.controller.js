@@ -110,6 +110,8 @@ const uploadRequirements = async (req, res) => {
     await File.create({
       pool,
       bucket,
+      model_uuid:  uuid,          
+      version:     version,       
       objectKey,
       filename:    file.originalname,
       size:        file.size,

@@ -1,0 +1,767 @@
+openapi: 3.0.0
+
+info:
+  title: CoEvolution Orchestrator API
+  description: |
+    Backend API for the CoEvolution AEGIS Testbed.
+    Handles model registration, file storage across MinIO pools, and real-time Kafka notifications.
+    
+    ## Authentication
+    Protected routes require a Bearer token from Keycloak.
+    Get a token from: `POST https://aegis.coevolution-project.eu/realms/coevolution/protocol/openid-connect/token`
+    
+    ## MinIO Pools
+    | Pool  | Purpose |
+    |-------|---------|
+    | TRP   | Trust Resources Pool |
+    | RP    | Report Pool |
+    | SAP   | Security Assurance Pool |
+    | AP    | Assessment Pool |
+    | STRDP | Security Trust Robustness Defence |
+  version: 1.0.0
+  contact:
+    name: CoEvolution Project EU
+
+servers:
+  - url: https://aegis.coevolution-project.eu/api/v1
+    description: Production (Kubernetes cluster)
+  - url: http://localhost:4000/api/v1
+    description: Local development
+
+# ── Security scheme ──────────────────────────────────────────
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Keycloak JWT token. Get one from the token endpoint.
+
+  # ── Reusable schemas ────────────────────────────────────────
+  schemas:
+
+    Versioning:
+      type: object
+      required:
+        - version
+      properties:
+        version:
+          type: string
+          example: v1.0
+        description:
+          type: string
+          example: Initial version
+        trusted:
+          type: boolean
+          default: false
+        requirements_file:
+          type: string
+          example: requirements.txt
+        requirements_url:
+          type: string
+          example: https://aegis.coevolution-project.eu/api/v1/models/uuid/versions/v1.0/requirements/download?pool=TRP&bucket=trusted-models
+        attacks:
+          type: array
+          items:
+            type: string
+          example: [ATK-001, ATK-002]
+        defences:
+          type: array
+          items:
+            type: string
+          example: [DEF-001]
+        assessments:
+          type: array
+          items:
+            type: string
+          example: [ASM-001]
+        risk_assessment_reports:
+          type: array
+          items:
+            type: string
+          example: [REP-001, REP-002]
+
+    Model:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        model_uuid:
+          type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: MySecurityModel
+        owner:
+          type: string
+          example: coevolution_user
+        type:
+          type: string
+          example: classification
+        versioning:
+          type: array
+          items:
+            $ref: '#/components/schemas/Versioning'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    File:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        pool:
+          type: string
+          enum: [SAP, RP, TRP, AP, STRDP]
+          example: RP
+        bucket:
+          type: string
+          example: risk-reports
+        model_uuid:
+          type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        version:
+          type: string
+          example: v1.0
+        objectKey:
+          type: string
+          example: 1712345678901-report.pdf
+        filename:
+          type: string
+          example: report.pdf
+        size:
+          type: number
+          example: 204800
+        contentType:
+          type: string
+          example: application/pdf
+        uploadedBy:
+          type: string
+          example: coevolution_user
+        tags:
+          type: array
+          items:
+            type: string
+          example: [risk, Q1]
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Server error
+        error:
+          type: string
+
+# ── Tags (groups in the UI) ──────────────────────────────────
+tags:
+  - name: Models
+    description: Model registration and versioning
+  - name: Requirements
+    description: Requirements file upload and download
+  - name: Security
+    description: Security data updated by the orchestrator
+  - name: Files
+    description: General file operations across all MinIO pools
+
+
+# ═══════════════════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════════════════
+paths:
+
+  # ── Models ──────────────────────────────────────────────────
+
+  /models:
+    get:
+      tags: [Models]
+      summary: Get all models
+      description: Returns all registered models sorted by creation date. Public — no token required.
+      responses:
+        '200':
+          description: List of models
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 3
+                  models:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Model'
+
+  /models/register:
+    post:
+      tags: [Models]
+      summary: Register a new model
+      description: |
+        Creates a new model in MongoDB. 
+        **owner** is set automatically from the Keycloak token — do not send it.
+        **model_uuid** is generated automatically — do not send it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, versioning]
+              properties:
+                name:
+                  type: string
+                  example: MySecurityModel
+                type:
+                  type: string
+                  example: classification
+                  description: dropdown selection
+                versioning:
+                  type: array
+                  items:
+                    type: object
+                    required: [version]
+                    properties:
+                      version:
+                        type: string
+                        example: v1.0
+                      description:
+                        type: string
+                        example: Initial version
+            example:
+              name: MySecurityModel
+              type: classification
+              versioning:
+                - version: v1.0
+                  description: Initial version
+      responses:
+        '201':
+          description: Model registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Model has been registered
+                  model:
+                    $ref: '#/components/schemas/Model'
+        '400':
+          description: Missing required fields
+        '401':
+          description: No token provided or invalid token
+
+  /models/{uuid}:
+    get:
+      tags: [Models]
+      summary: Get model by UUID
+      description: Returns a single model by its UUID. Public — no token required.
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        '200':
+          description: Model found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  model:
+                    $ref: '#/components/schemas/Model'
+        '404':
+          description: Model not found
+
+  /models/{uuid}/versions:
+    post:
+      tags: [Models]
+      summary: Add a new version to an existing model
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version:
+                  type: string
+                  example: v2.0
+                description:
+                  type: string
+                  example: Updated version with fixes
+            example:
+              version: v2.0
+              description: Updated version with fixes
+      responses:
+        '201':
+          description: Version added
+        '404':
+          description: Model not found
+
+  # ── Requirements ─────────────────────────────────────────────
+
+  /models/{uuid}/versions/{version}/requirements:
+    post:
+      tags: [Requirements]
+      summary: Upload requirements file
+      description: |
+        Uploads a requirements file to MinIO and links it to the model version.
+        File is stored with key format: `uuid-version-filename.ext`
+        Also saves metadata to the files collection in MongoDB.
+        Publishes a `requirements-uploaded` Kafka event to notify RAGRE.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          example: v1.0
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, pool, bucket]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The requirements file
+                pool:
+                  type: string
+                  enum: [SAP, RP, TRP, AP, STRDP]
+                  example: TRP
+                bucket:
+                  type: string
+                  example: trusted-models
+      responses:
+        '200':
+          description: File uploaded and model updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Requirements file uploaded
+                  requirements_file:
+                    type: string
+                    example: requirements.txt
+                  requirements_url:
+                    type: string
+                  object_key:
+                    type: string
+                  pool:
+                    type: string
+                  bucket:
+                    type: string
+        '400':
+          description: Missing required fields
+        '404':
+          description: Model, version or bucket not found
+
+  /models/{uuid}/versions/{version}/requirements/download:
+    get:
+      tags: [Requirements]
+      summary: Download requirements file
+      description: |
+        Streams the requirements file from MinIO directly to the client.
+        Public — partners can access without a token.
+        pool and bucket must be provided as query parameters.
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+          example: v1.0
+        - name: pool
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [SAP, RP, TRP, AP, STRDP]
+          example: TRP
+        - name: bucket
+          in: query
+          required: true
+          schema:
+            type: string
+          example: trusted-models
+      responses:
+        '200':
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Model, version or file not found
+
+  # ── Security data ────────────────────────────────────────────
+
+  /models/{uuid}/versions/{version}/requirements-url:
+    patch:
+      tags: [Security]
+      summary: Update requirements URL
+      description: Called by the orchestrator after processing to update the download URL.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  example: https://aegis.coevolution-project.eu/api/v1/models/uuid/versions/v1.0/requirements/download
+      responses:
+        '200':
+          description: URL updated
+        '404':
+          description: Model or version not found
+
+  /models/{uuid}/versions/{version}/security:
+    patch:
+      tags: [Security]
+      summary: Update security data
+      description: |
+        Called by RAGRE to update attacks, defences, assessments and reports.
+        All fields are optional — only send what you want to update.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trusted:
+                  type: boolean
+                  example: true
+                attacks:
+                  type: array
+                  items:
+                    type: string
+                  example: [ATK-001, ATK-002]
+                defences:
+                  type: array
+                  items:
+                    type: string
+                  example: [DEF-001]
+                assessments:
+                  type: array
+                  items:
+                    type: string
+                  example: [ASM-001]
+                risk_assessment_reports:
+                  type: array
+                  items:
+                    type: string
+                  example: [REP-001]
+            example:
+              trusted: true
+              attacks: [ATK-001, ATK-002]
+              defences: [DEF-001]
+              assessments: [ASM-001]
+              risk_assessment_reports: [REP-001]
+      responses:
+        '200':
+          description: Security data updated
+        '404':
+          description: Model or version not found
+
+  # ── Files ────────────────────────────────────────────────────
+
+  /files/upload:
+    post:
+      tags: [Files]
+      summary: Upload a file to any pool and bucket
+      description: |
+        Uploads a file to the specified MinIO pool and bucket.
+        Saves metadata to the files collection in MongoDB.
+        Publishes a Kafka event based on the bucket:
+        - `trusted-models` → `requirements-uploaded`
+        - `risk-reports` → `risk-report-ready`
+        - `assessment-reports` → `assessment-uploaded`
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, pool, bucket, model_uuid, version]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                pool:
+                  type: string
+                  enum: [SAP, RP, TRP, AP, STRDP]
+                  example: RP
+                bucket:
+                  type: string
+                  example: risk-reports
+                model_uuid:
+                  type: string
+                  example: 550e8400-e29b-41d4-a716-446655440000
+                version:
+                  type: string
+                  example: v1.0
+                tags:
+                  type: string
+                  description: comma-separated tags
+                  example: risk,Q1,security
+      responses:
+        '201':
+          description: File uploaded and metadata saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File uploaded successfully
+                  file:
+                    $ref: '#/components/schemas/File'
+        '400':
+          description: Missing required fields
+        '404':
+          description: Bucket does not exist in pool
+
+  /files:
+    get:
+      tags: [Files]
+      summary: List files
+      description: List all files. Filter by pool and/or bucket. Public.
+      parameters:
+        - name: pool
+          in: query
+          schema:
+            type: string
+            enum: [SAP, RP, TRP, AP, STRDP]
+          example: RP
+        - name: bucket
+          in: query
+          schema:
+            type: string
+          example: risk-reports
+      responses:
+        '200':
+          description: List of files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  files:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/File'
+
+  /files/search:
+    get:
+      tags: [Files]
+      summary: Search files
+      description: Search files by any combination of fields. Public.
+      parameters:
+        - name: model_uuid
+          in: query
+          schema:
+            type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        - name: pool
+          in: query
+          schema:
+            type: string
+            enum: [SAP, RP, TRP, AP, STRDP]
+        - name: bucket
+          in: query
+          schema:
+            type: string
+          example: risk-reports
+        - name: uploadedBy
+          in: query
+          schema:
+            type: string
+          example: coevolution_user
+        - name: tags
+          in: query
+          schema:
+            type: string
+          description: comma-separated tags
+          example: risk,Q1
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+          example: 2026-01-01
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+          example: 2026-12-31
+      responses:
+        '200':
+          description: Matching files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  files:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/File'
+
+  /files/download/{id}:
+    get:
+      tags: [Files]
+      summary: Download file by MongoDB ID
+      description: Streams the file from MinIO to the client. Public.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: File stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: File not found
+
+  /files/url/{id}:
+    get:
+      tags: [Files]
+      summary: Get presigned download URL
+      description: Returns a temporary URL valid for 1 hour for direct MinIO download.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: Presigned URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                  expiresIn:
+                    type: string
+                    example: 1 hour
+        '404':
+          description: File not found
+
+  /files/{id}:
+    delete:
+      tags: [Files]
+      summary: Delete a file
+      description: Deletes the file from MinIO and removes metadata from MongoDB.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: 507f1f77bcf86cd799439011
+      responses:
+        '200':
+          description: File deleted
+        '404':
+          description: File not found
+
+  

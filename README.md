@@ -312,17 +312,17 @@ Kafka publishes: `assessment-uploaded`
 
 | Pool  | Bucket | Purpose |
 |-------|--------|---------|
-| SAP   | ai-mbom | AI model bill of materials |
-| RP    | risk-reports | Risk reports from RAGRE |
-| RP    | assessment-reports | Final assessment reports from users |
-| RP    | defence-reports | Defence reports |
-| TRP   | trusted-data | Trusted data files |
-| TRP   | trusted-models | Requirements files from users |
-| AP    | assessment-libraries | Assessment libraries |
-| AP    | assessment-tools | Assessment tools |
-| STRDP | defence-libraries | Defence libraries |
-| STRDP | design-train-defence-tools | Design and training defence tools |
-| STRDP | deployment-test-defence-tools | Deployment and testing defence tools |
+| SAP   | ai-mbom |  |
+| RP    | risk-reports |  |
+| RP    | assessment-reports |  |
+| RP    | defence-reports |  |
+| TRP   | trusted-data |  |
+| TRP   | trusted-models |  |
+| AP    | assessment-libraries | |
+| AP    | assessment-tools |  |
+| STRDP | defence-libraries |  |
+| STRDP | design-train-defence-tools |  |
+| STRDP | deployment-test-defence-tools |  |
 
 ---
 
@@ -412,17 +412,22 @@ Every push to `main` triggers GitHub Actions:
 |---------|-----|-------------|
 | Angular UI | https://aegis.coevolution-project.eu/fvt/ | Keycloak login |
 | Swagger API docs | https://aegis.coevolution-project.eu/api/docs | Public |
-| Keycloak admin | https://aegis.coevolution-project.eu/admin/ | admin / keycloackadmin |
-| MinIO SAP | https://aegis.coevolution-project.eu/sap/ | sapadmin / sappassword |
-| MinIO RP | https://aegis.coevolution-project.eu/rp/ | rpadmin / rppassword |
-| MinIO TRP | https://aegis.coevolution-project.eu/trp/ | trpadmin / trppassword |
-| MinIO AP | https://aegis.coevolution-project.eu/ap/ | apadmin / appassword |
-| MinIO STRDP | https://aegis.coevolution-project.eu/strdp/ | strdpadmin / strdppassword |
+| Keycloak admin | https://aegis.coevolution-project.eu/admin/ |  |
+| MinIO SAP | https://aegis.coevolution-project.eu/sap/ |  |
+| MinIO RP | https://aegis.coevolution-project.eu/rp/ |  |
+| MinIO TRP | https://aegis.coevolution-project.eu/trp/ |  |
+| MinIO AP | https://aegis.coevolution-project.eu/ap/ |  |
+| MinIO STRDP | https://aegis.coevolution-project.eu/strdp/ |  |
 | Kafdrop | https://aegis.coevolution-project.eu/kafdrop/ | Public |
-| MongoDB UI | https://aegis.coevolution-project.eu/mongo/ | aegis-express-admin / AegisExpr2026 |
+| MongoDB UI | https://aegis.coevolution-project.eu/mongo/ |  |
 
 ---
 
 ## License
 
 CoEvolution Project EU
+
+## Author
+
+**Konstantinos Krouti**   
+GitHub: (https://github.com/kostaskr13)

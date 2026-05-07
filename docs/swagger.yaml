@@ -324,6 +324,57 @@ paths:
         '404':
           description: Model not found
 
+
+  /models/{uuid}/versions/{version}/reports:
+      get:
+        tags: [Models]
+        summary: Get reports for a model version
+        description: |
+          Returns files linked to this model version by report type.
+          Uses the model's versioning array — not a general file search.
+          - risk → risk_assessment_reports[]
+          - assessment → assessments[]
+          - defence → defences[]
+        parameters:
+          - name: uuid
+            in: path
+            required: true
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          - name: version
+            in: path
+            required: true
+            schema:
+              type: string
+            example: v1.0
+          - name: type
+            in: query
+            required: true
+            schema:
+              type: string
+              enum: [risk, assessment, defence]
+            example: risk
+        responses:
+          '200':
+            description: List of report files
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                      example: 1
+                    files:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/File'
+          '400':
+            description: Missing or invalid type
+          '404':
+            description: Model or version not found
+
   # ── Requirements ─────────────────────────────────────────────
 
   /models/{uuid}/versions/{version}/requirements:

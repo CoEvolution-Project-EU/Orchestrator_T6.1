@@ -11,6 +11,7 @@ import {
   downloadRequirements,
   updateRequirementsUrl,
   updateSecurityData,
+  getReports
 } from '../controllers/model.controller.js'
 
 const router = Router()
@@ -19,6 +20,7 @@ const upload = multer({ storage: multer.memoryStorage() })
 // Public
 router.get('/',      getAllModels)
 router.get('/:uuid', getModelByUUID)
+router.get('/:uuid/versions/:version/reports', getReports)
 
 // Download requirements — public so partners can access
 router.get('/:uuid/versions/:version/requirements/download', downloadRequirements)

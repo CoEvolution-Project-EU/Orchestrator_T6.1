@@ -3,6 +3,7 @@
 
 import { getPool } from '../config/minio.js'
 import { File } from '../models/file.model.js'
+import { Model } from '../models/models.model.js' 
 
 // ── Upload a file ─────────────────────────────────────────────
 // POST /api/v1/files/upload
@@ -24,7 +25,7 @@ const uploadFile = async (req, res) => {
     }
 
     // Generate unique object key
-    const objectKey = `${Date.now()}-${file.originalname}`
+    const objectKey = `${file.originalname}`
 
     // Upload to MinIO
     await client.putObject(
@@ -48,6 +49,27 @@ const uploadFile = async (req, res) => {
       uploadedBy:  req.user?.username || 'backend',  // ✓ optional in schema
       tags:        tags ? tags.split(',').map(t => t.trim()) : [],  // ✓ optional in schema
     })
+
+    const reportBuckets = {
+      'risk-reports':       'risk_assessment_reports',
+      'assessment-reports': 'assessments',
+      'defence-reports':    'defences',
+    }
+
+    const fieldToUpdate = reportBuckets[bucket]
+
+    if (fieldToUpdate && model_uuid && version) {
+      const model = await Model.findOne({ model_uuid })
+      if (model) {
+        const v = model.versioning.find(v => v.version === version)
+        if (v) {
+          v[fieldToUpdate].push(doc._id.toString())  // ← add file MongoDB ID
+          await model.save()
+          console.log(`[Model] Updated ${fieldToUpdate} for model ${model_uuid} version ${version}`)
+        }
+      }
+    }
+
 
     res.status(201).json({
       message: 'File uploaded successfully',
@@ -100,6 +122,7 @@ const searchFiles = async (req, res) => {
     const query = {}
 
     if (modelName)  query.modelName  = modelName
+    if (version)    query.version    = version
     if (pool)       query.pool       = pool
     if (bucket)     query.bucket     = bucket
     if (uploadedBy) query.uploadedBy = uploadedBy

@@ -232,6 +232,46 @@ const updateSecurityData = async (req, res) => {
   }
 }
 
+
+// GET /api/v1/models/:uuid/versions/:version/reports?type=risk
+const getReports = async (req, res) => {
+  try {
+    const { uuid, version } = req.params
+    const { type } = req.query
+
+    if (!type) return res.status(400).json({ message: 'type is required (risk, assessment, defence)' })
+
+    const model = await Model.findOne({ model_uuid: uuid })
+    if (!model) return res.status(404).json({ message: 'Model not found' })
+
+    const v = model.versioning.find(v => v.version === version)
+    if (!v) return res.status(404).json({ message: 'Version not found' })
+
+    // Map type to schema field
+    const fieldMap = {
+      'risk':       'risk_assessment_reports',
+      'assessment': 'assessments',
+      'defence':    'defences',
+    }
+
+    const field = fieldMap[type]
+    if (!field) return res.status(400).json({ message: `Unknown type: ${type}. Use risk, assessment or defence` })
+
+    const fileIds = v[field]   // array of MongoDB file IDs
+
+    if (!fileIds || fileIds.length === 0) {
+      return res.status(200).json({ count: 0, files: [] })
+    }
+
+    // Fetch the actual file documents from files collection
+    const files = await File.find({ _id: { $in: fileIds } })
+
+    res.status(200).json({ count: files.length, files })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
 export {
   registerModel,
   getAllModels,
@@ -241,4 +281,5 @@ export {
   downloadRequirements,
   updateRequirementsUrl,
   updateSecurityData,
+  getReports
 }

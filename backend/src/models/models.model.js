@@ -24,10 +24,6 @@ const versioningSchema = new Schema(
         default: false,
       },
       // below fields are continuously updated by the orchestrator
-      attacks: {
-        type: [String],            // e.g. ["ATK-001", "ATK-002"]
-        default: [],
-      },
       defences: {
         type: [String],            // e.g. ["DEF-001", "DEF-002"]
         default: [],

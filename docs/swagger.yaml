@@ -166,8 +166,6 @@ components:
 tags:
   - name: Models
     description: Model registration and versioning
-  - name: Requirements
-    description: Requirements file upload and download
   - name: Security
     description: Security data updated by the orchestrator
   - name: Files
@@ -375,121 +373,7 @@ paths:
           '404':
             description: Model or version not found
 
-  # ── Requirements ─────────────────────────────────────────────
 
-  /models/{uuid}/versions/{version}/requirements:
-    post:
-      tags: [Requirements]
-      summary: Upload requirements file
-      description: |
-        Uploads a requirements file to MinIO and links it to the model version.
-        File is stored with key format: `uuid-version-filename.ext`
-        Also saves metadata to the files collection in MongoDB.
-        Publishes a `requirements-uploaded` Kafka event to notify RAGRE.
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-          example: 550e8400-e29b-41d4-a716-446655440000
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-          example: v1.0
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file, pool, bucket]
-              properties:
-                file:
-                  type: string
-                  format: binary
-                  description: The requirements file
-                pool:
-                  type: string
-                  enum: [SAP, RP, TRP, AP, STRDP]
-                  example: TRP
-                bucket:
-                  type: string
-                  example: trusted-models
-      responses:
-        '200':
-          description: File uploaded and model updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Requirements file uploaded
-                  requirements_file:
-                    type: string
-                    example: requirements.txt
-                  requirements_url:
-                    type: string
-                  object_key:
-                    type: string
-                  pool:
-                    type: string
-                  bucket:
-                    type: string
-        '400':
-          description: Missing required fields
-        '404':
-          description: Model, version or bucket not found
-
-  /models/{uuid}/versions/{version}/requirements/download:
-    get:
-      tags: [Requirements]
-      summary: Download requirements file
-      description: |
-        Streams the requirements file from MinIO directly to the client.
-        Public — partners can access without a token.
-        pool and bucket must be provided as query parameters.
-      parameters:
-        - name: uuid
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: version
-          in: path
-          required: true
-          schema:
-            type: string
-          example: v1.0
-        - name: pool
-          in: query
-          required: true
-          schema:
-            type: string
-            enum: [SAP, RP, TRP, AP, STRDP]
-          example: TRP
-        - name: bucket
-          in: query
-          required: true
-          schema:
-            type: string
-          example: trusted-models
-      responses:
-        '200':
-          description: File stream
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        '404':
-          description: Model, version or file not found
 
   # ── Security data ────────────────────────────────────────────
 
@@ -591,65 +475,75 @@ paths:
           description: Model or version not found
 
   # ── Files ────────────────────────────────────────────────────
-
   /files/upload:
-    post:
-      tags: [Files]
-      summary: Upload a file to any pool and bucket
-      description: |
-        Uploads a file to the specified MinIO pool and bucket.
-        Saves metadata to the files collection in MongoDB.
-        Publishes a Kafka event based on the bucket:
-        - `trusted-models` → `requirements-uploaded`
-        - `risk-reports` → `risk-report-ready`
-        - `assessment-reports` → `assessment-uploaded`
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file, pool, bucket, model_uuid, version]
-              properties:
-                file:
-                  type: string
-                  format: binary
-                pool:
-                  type: string
-                  enum: [SAP, RP, TRP, AP, STRDP]
-                  example: RP
-                bucket:
-                  type: string
-                  example: risk-reports
-                model_uuid:
-                  type: string
-                  example: 550e8400-e29b-41d4-a716-446655440000
-                version:
-                  type: string
-                  example: v1.0
-                tags:
-                  type: string
-                  description: comma-separated tags
-                  example: risk,Q1,security
-      responses:
-        '201':
-          description: File uploaded and metadata saved
+      post:
+        tags: [Files]
+        summary: Upload one or more files to any pool and bucket
+        description: |
+          Accepts 1 or more files. Saves each to MinIO and MongoDB.
+          Publishes ONE Kafka event based on bucket:
+          - `trusted-models`   → `ragre_models` (requirements → RAGRE)
+          - `user-assessments` → `assessment-uploaded` (user files → Engine)
+          - `user-defences`    → `defence-uploaded` (user files → Engine)
+          - `risk-reports`     → `risk-report-ready` (engine results → UI)
+        security:
+          - bearerAuth: []
+        requestBody:
+          required: true
           content:
-            application/json:
+            multipart/form-data:
               schema:
                 type: object
+                required: [files, pool, bucket, model_uuid, version]
                 properties:
-                  message:
+                  files:
+                    type: array
+                    items:
+                      type: string
+                      format: binary
+                    description: One or more files
+                  pool:
                     type: string
-                    example: File uploaded successfully
-                  file:
-                    $ref: '#/components/schemas/File'
-        '400':
-          description: Missing required fields
-        '404':
-          description: Bucket does not exist in pool
+                    enum: [SAP, RP, TRP, AP, STRDP]
+                    example: TRP
+                  bucket:
+                    type: string
+                    example: trusted-models
+                    description: |
+                      trusted-models, user-assessments, user-defences,
+                      risk-reports, assessment-reports, defence-reports
+                  model_uuid:
+                    type: string
+                    example: 550e8400-e29b-41d4-a716-446655440000
+                  version:
+                    type: string
+                    example: v1.0
+                  tags:
+                    type: string
+                    description: comma-separated tags
+                    example: risk,Q1,security
+        responses:
+          '201':
+            description: Files uploaded and metadata saved
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: 2 file(s) uploaded successfully
+                    total_files:
+                      type: integer
+                      example: 2
+                    files:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/File'
+          '400':
+            description: Missing required fields
+          '404':
+            description: Bucket does not exist in pool
 
   /files:
     get:
@@ -684,63 +578,47 @@ paths:
                       $ref: '#/components/schemas/File'
 
   /files/search:
-    get:
-      tags: [Files]
-      summary: Search files
-      description: Search files by any combination of fields. Public.
-      parameters:
-        - name: model_uuid
-          in: query
-          schema:
-            type: string
-          example: 550e8400-e29b-41d4-a716-446655440000
-        - name: pool
-          in: query
-          schema:
-            type: string
-            enum: [SAP, RP, TRP, AP, STRDP]
-        - name: bucket
-          in: query
-          schema:
-            type: string
-          example: risk-reports
-        - name: uploadedBy
-          in: query
-          schema:
-            type: string
-          example: coevolution_user
-        - name: tags
-          in: query
-          schema:
-            type: string
-          description: comma-separated tags
-          example: risk,Q1
-        - name: from
-          in: query
-          schema:
-            type: string
-            format: date
-          example: 2026-01-01
-        - name: to
-          in: query
-          schema:
-            type: string
-            format: date
-          example: 2026-12-31
-      responses:
-        '200':
-          description: Matching files
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  count:
-                    type: integer
-                  files:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/File'
+      get:
+        tags: [Files]
+        summary: Search files
+        description: Search files by model, version and report type. Public.
+        parameters:
+          - name: model_uuid
+            in: query
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          - name: version
+            in: query
+            schema:
+              type: string
+            example: v1.0
+          - name: report_type
+            in: query
+            schema:
+              type: string
+              enum: [risk, assessment, defence, trusted]
+            description: |
+              Filter by report type — pool and bucket set automatically:
+              - risk       → RP/risk-reports
+              - assessment → RP/assessment-reports
+              - defence    → RP/defence-reports
+              - trusted    → TRP/trusted-models
+            example: risk
+        responses:
+          '200':
+            description: Matching files
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    count:
+                      type: integer
+                    files:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/File'
 
   /files/download/{id}:
     get:

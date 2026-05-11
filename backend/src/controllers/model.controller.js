@@ -1,8 +1,6 @@
 // src/controllers/model.controller.js
-import { Model } from '../models/models.model.js';
-import { getPool } from '../config/minio.js'
-import { File } from '../models/file.model.js' 
-import { producer,publishEvent } from '../config/kafka.js'
+import { Model } from '../models/models.model.js'
+import { File } from '../models/file.model.js'
 
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
@@ -68,124 +66,9 @@ const addVersion = async (req, res) => {
   }
 }
 
-// ── Upload requirements file ──────────────────────────────────
-// POST /api/v1/models/:uuid/versions/:version/requirements
-// Stores file in MinIO TRP pool / trusted-data bucket
-// Object key format: uuid-version-filename.ext
-const uploadRequirements = async (req, res) => {
-  try {
-    const { uuid, version } = req.params
-    const { pool, bucket } = req.body
-    const file = req.file
 
-    if (!file)   return res.status(400).json({ message: 'File is required' })
-    if (!pool)   return res.status(400).json({ message: 'pool is required' })
-    if (!bucket) return res.status(400).json({ message: 'bucket is required' })
 
-    const model = await Model.findOne({ model_uuid: uuid })
-    if (!model) return res.status(404).json({ message: 'Model not found' })
 
-    const v = model.versioning.find(v => v.version === version)
-    if (!v) return res.status(404).json({ message: 'Version not found' })
-
-    const objectKey   = `${uuid}-${version}-${file.originalname}`
-    const minioClient = getPool(pool)
-    if (!minioClient) return res.status(400).json({ message: `Unknown pool: ${pool}` })
-
-    // Make sure bucket exists
-    const exists = await minioClient.bucketExists(bucket)
-    if (!exists) return res.status(404).json({ 
-      message: `Bucket "${bucket}" does not exist in pool "${pool}"` 
-    })
-    // Upload to whichever pool/bucket the user passed
-    await minioClient.putObject(
-      bucket,
-      objectKey,
-      file.buffer,
-      file.size,
-      { 'Content-Type': file.mimetype || 'application/octet-stream' }
-    )
-
-        // Save to files collection in MongoDB ← add this block
-    await File.create({
-      pool,
-      bucket,
-      model_uuid:  uuid,          
-      version:     version,       
-      objectKey,
-      filename:    file.originalname,
-      size:        file.size,
-      contentType: file.mimetype || 'application/octet-stream',
-      modelName:   model.name,           // link to the model name
-      uploadedBy:  req.user?.username || 'backend',
-      tags:        [`model:${uuid}`, `version:${version}`],  // tag with model and version
-    })
-
-    // Update model versioning with file info
-    v.requirements_file = file.originalname
-    // When uploading — encode pool and bucket in the URL
-    v.requirements_url = `https://aegis.coevolution-project.eu/api/v1/models/${uuid}/versions/${version}/requirements/download?pool=${pool}&bucket=${bucket}`   
-    await model.save()
-
-    res.status(200).json({
-      message:           'Requirements file uploaded',
-      requirements_file: v.requirements_file,
-      requirements_url:  v.requirements_url,
-      object_key:        objectKey,
-      pool,
-      bucket,
-    })
-
-        // Notify partner via Kafka
-    await publishEvent('ragre_models', {
-      event:             'ragre_models',
-      modelName:         model.name,
-      modelUuid:         uuid,
-      owner:             model.owner,
-      version:           version,
-      requirements_file: file.originalname,
-      requirements_url:  v.requirements_url,
-      pool,
-      bucket,
-      uploadedAt:        new Date().toISOString(),
-    })
-
-    console.log(`[Kafka] Event published: ragre_models for model ${model.name}`)
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message })
-  }
-}
-
-// ── Download requirements file ────────────────────────────────
-// GET /api/v1/models/:uuid/versions/:version/requirements/download
-const downloadRequirements = async (req, res) => {
-  try {
-    const { uuid, version } = req.params
-    const { pool, bucket }  = req.query   // ← from URL query params
-
-    if (!pool)  return res.status(400).json({ message: 'pool is required' })
-    if (!bucket) return res.status(400).json({ message: 'bucket is required' })
-
-    const model = await Model.findOne({ model_uuid: uuid })
-    if (!model) return res.status(404).json({ message: 'Model not found' })
-
-    const v = model.versioning.find(v => v.version === version)
-    if (!v)                   return res.status(404).json({ message: 'Version not found' })
-    if (!v.requirements_file) return res.status(404).json({ message: 'No requirements file' })
-
-    const objectKey   = `${uuid}-${version}-${v.requirements_file}`
-    const minioClient = getPool(pool)
-    if (!minioClient) return res.status(400).json({ message: `Unknown pool: ${pool}` })
-
-    const stream = await minioClient.getObject(bucket, objectKey)
-
-    res.setHeader('Content-Disposition', `attachment; filename="${v.requirements_file}"`)
-    res.setHeader('Content-Type', 'application/octet-stream')
-    stream.pipe(res)
-  } catch (error) {
-    res.status(500).json({ message: 'Download failed', error: error.message })
-  }
-}
 
 // ── Update requirements URL (orchestrator) ────────────────────
 const updateRequirementsUrl = async (req, res) => {
@@ -210,7 +93,7 @@ const updateRequirementsUrl = async (req, res) => {
 // ── Update security data (orchestrator) ──────────────────────
 const updateSecurityData = async (req, res) => {
   try {
-    const { attacks, defences, assessments, risk_assessment_reports, trusted } = req.body
+    const {  defences, assessments, risk_assessment_reports, trusted } = req.body
     const { uuid, version } = req.params
 
     const model = await Model.findOne({ model_uuid: uuid })
@@ -219,7 +102,6 @@ const updateSecurityData = async (req, res) => {
     const v = model.versioning.find(v => v.version === version)
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    if (attacks)                  v.attacks                 = attacks
     if (defences)                 v.defences                = defences
     if (assessments)              v.assessments             = assessments
     if (risk_assessment_reports)  v.risk_assessment_reports = risk_assessment_reports
@@ -277,8 +159,6 @@ export {
   getAllModels,
   getModelByUUID,
   addVersion,
-  uploadRequirements,
-  downloadRequirements,
   updateRequirementsUrl,
   updateSecurityData,
   getReports

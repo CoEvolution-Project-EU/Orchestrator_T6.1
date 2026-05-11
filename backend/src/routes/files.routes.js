@@ -17,7 +17,7 @@ const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
 // Protected — require Keycloak token
-router.post('/upload',      requireAuth, upload.single('file'), uploadFile)
+router.post('/upload', requireAuth, upload.array('files', 20), uploadFile)
 router.get('/url/:id',      requireAuth, getPresignedUrl)
 router.delete('/:id',       requireAuth, deleteFile)
 

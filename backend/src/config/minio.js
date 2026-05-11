@@ -51,7 +51,7 @@ export function getPool(poolName) {
 export async function initMinIO() {
   const buckets = {
     SAP:   ['ai-mbom'],
-    RP:    ['risk-reports','assessment-reports','defence-reports'],
+    RP:    ['risk-reports','assessment-reports','defence-reports','user-assessment-reports','user-defence-reports'],
     TRP:   ['trusted-data', 'trusted-models'],
     AP:    ['assessment-libraries','assessment-tools'],
     STRDP: ['defence-libraries','design-train-defence-tools','deployment-test-defence-tools'],

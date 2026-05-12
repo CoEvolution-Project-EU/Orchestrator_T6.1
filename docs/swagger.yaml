@@ -497,7 +497,7 @@ paths:
                 required: [files, pool, bucket, model_uuid, version]
                 properties:
                   files:
-                    type: string
+                    type: array
                     items:
                       type: string
                       format: binary

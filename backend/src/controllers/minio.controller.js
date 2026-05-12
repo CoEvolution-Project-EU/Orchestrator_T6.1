@@ -104,14 +104,25 @@ const uploadFile = async (req, res) => {
 
     if (topic) {
       try {
+
+        const modelDoc = await Model.findOne({ model_uuid }) 
+
         await publishEvent(topic, {
           event:       topic,
+          model_name:  modelDoc?.name || null, 
           model_uuid,
           version,
           uploadedBy:  req.user?.username || 'backend',
           uploadedAt:  new Date().toISOString(),
+          pool,                               // ← move pool to top level
+          tags:        tags ? tags.split(',').map(t => t.trim()) : [],  // ← move tags to top level
           total_files: uploadedDocs.length,
-          files:       uploadedDocs,
+          files:       uploadedDocs.map(doc => ({   // ← only keep needed fields
+            _id:          doc._id,
+            bucket:       doc.bucket,
+            filename:     doc.filename,
+            download_url: doc.download_url,
+          })),
         })
         console.log(`[Kafka] Event published: ${topic} — ${uploadedDocs.length} file(s)`)
       } catch (kafkaError) {

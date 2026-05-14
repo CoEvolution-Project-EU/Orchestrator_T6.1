@@ -139,6 +139,7 @@ const getReports = async (req, res) => {
       'aimodelinfo': 'aimodelinfo_reports', 
       'euaiact':     'euaiact_reports',      
       'datasets':    'datasets_reports',  
+      'aimbom':      'ai_mbom',  
     }
 
     const field = fieldMap[type]

@@ -52,6 +52,10 @@ const versioningSchema = new Schema(
          type: [String], 
          default: [] 
         },
+      ai_mbom: {
+         type: [String], 
+         default: [] 
+        },
     },
     {
         timestamps: true

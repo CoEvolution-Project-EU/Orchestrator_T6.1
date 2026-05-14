@@ -545,6 +545,8 @@ paths:
                       RP pool:
                         risk-reports, assessment-reports, defence-reports,
                         gadgets-reports, aimodelinfo-reports, euaiact-reports, datasets-reports
+                      SAP pool:
+                        ai-mbom
                       User uploads (RP pool):
                         user-assessments, user-defences
                   model_uuid:
@@ -632,7 +634,7 @@ paths:
             in: query
             schema:
               type: string
-              enum: [risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, requirements]
+              enum: [risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, requirements,aimbom]
             description: |
               Filter by report type — pool and bucket set automatically:
               - risk        → RP/risk-reports
@@ -643,6 +645,7 @@ paths:
               - euaiact     → RP/euaiact-reports
               - datasets    → RP/datasets-reports
               - requirements     → TRP/trusted-models
+              - aimbom      → SAP/ai-mbom
             example: risk
         responses:
           '200':

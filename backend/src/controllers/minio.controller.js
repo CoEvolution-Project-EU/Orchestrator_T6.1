@@ -81,6 +81,7 @@ const uploadFile = async (req, res) => {
       'aimodelinfo-reports': 'aimodelinfo_reports',  
       'euaiact-reports':     'euaiact_reports',       
       'datasets-reports':    'datasets_reports',
+      'ai-mbom':             'ai_mbom', 
     }
 
     const fieldToUpdate = reportBuckets[bucket]

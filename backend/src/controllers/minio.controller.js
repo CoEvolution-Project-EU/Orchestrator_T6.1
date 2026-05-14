@@ -77,6 +77,10 @@ const uploadFile = async (req, res) => {
       'risk-reports':       'risk_assessment_reports',
       'assessment-reports': 'assessments',
       'defence-reports':    'defences',
+      'gadgets-reports':     'gadgets_reports',       
+      'aimodelinfo-reports': 'aimodelinfo_reports',  
+      'euaiact-reports':     'euaiact_reports',       
+      'datasets-reports':    'datasets_reports',
     }
 
     const fieldToUpdate = reportBuckets[bucket]
@@ -192,7 +196,11 @@ const searchFiles = async (req, res) => {
       'risk':       { pool: 'RP',  bucket: 'risk-reports' },
       'assessment': { pool: 'RP',  bucket: 'assessment-reports' },
       'defence':    { pool: 'RP',  bucket: 'defence-reports' },
-      'trusted':    { pool: 'TRP', bucket: 'trusted-models' },
+      'gadgets':     { pool: 'RP',  bucket: 'gadgets-reports' },      
+      'aimodelinfo': { pool: 'RP',  bucket: 'aimodelinfo-reports' }, 
+      'euaiact':     { pool: 'RP',  bucket: 'euaiact-reports' },       
+      'datasets':    { pool: 'RP',  bucket: 'datasets-reports' }, 
+      'requirements':    { pool: 'TRP', bucket: 'trusted-models' },
     }
 
     if (report_type) {

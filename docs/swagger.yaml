@@ -374,7 +374,36 @@ paths:
           '404':
             description: Model or version not found
 
-
+  /models/{uuid}/versions/{version}/aimbom:
+      post:
+        tags: [Models]
+        summary: Generate AI-MBOM
+        description: |
+          Fetches the latest risk, assessment and defence reports for this model version
+          and publishes a Kafka event to the `strae` topic to trigger AI-MBOM generation.
+          At least one report must exist.
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: uuid
+            in: path
+            required: true
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          - name: version
+            in: path
+            required: true
+            schema:
+              type: string
+            example: v1.0
+        responses:
+          '200':
+            description: AI-MBOM generation requested — Kafka event published to strae topic
+          '404':
+            description: Model, version or no reports found
+          '401':
+            description: No token provided
 
   # ── Security data ────────────────────────────────────────────
 
@@ -511,8 +540,13 @@ paths:
                     type: string
                     example: trusted-models
                     description: |
-                      trusted-models, user-assessments, user-defences,
-                      risk-reports, assessment-reports, defence-reports
+                      TRP pool:
+                        trusted-models
+                      RP pool:
+                        risk-reports, assessment-reports, defence-reports,
+                        gadgets-reports, aimodelinfo-reports, euaiact-reports, datasets-reports
+                      User uploads (RP pool):
+                        user-assessments, user-defences
                   model_uuid:
                     type: string
                     example: 550e8400-e29b-41d4-a716-446655440000
@@ -598,13 +632,17 @@ paths:
             in: query
             schema:
               type: string
-              enum: [risk, assessment, defence, trusted]
+              enum: [risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, requirements]
             description: |
               Filter by report type — pool and bucket set automatically:
-              - risk       → RP/risk-reports
-              - assessment → RP/assessment-reports
-              - defence    → RP/defence-reports
-              - trusted    → TRP/trusted-models
+              - risk        → RP/risk-reports
+              - assessment  → RP/assessment-reports
+              - defence     → RP/defence-reports
+              - gadgets     → RP/gadgets-reports
+              - aimodelinfo → RP/aimodelinfo-reports
+              - euaiact     → RP/euaiact-reports
+              - datasets    → RP/datasets-reports
+              - requirements     → TRP/trusted-models
             example: risk
         responses:
           '200':

@@ -36,6 +36,22 @@ const versioningSchema = new Schema(
         type: [String],            // e.g. ["REP-001", "REP-002"]
         default: [],
       },
+      gadgets_reports:{ 
+        type: [String],
+        default: [] 
+      },
+      aimodelinfo_reports: {
+         type: [String], 
+         default: [] 
+        },
+      euaiact_reports:     {
+         type: [String], 
+         default: [] 
+        },
+      datasets_reports:    {
+         type: [String], 
+         default: [] 
+        },
     },
     {
         timestamps: true

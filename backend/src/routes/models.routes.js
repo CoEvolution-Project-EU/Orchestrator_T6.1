@@ -9,7 +9,8 @@ import {
   addVersion,
   updateRequirementsUrl,
   updateSecurityData,
-  getReports
+  getReports,
+  generateAIMBOM
 } from '../controllers/model.controller.js'
 
 const router = Router()
@@ -26,5 +27,6 @@ router.post('/register',                                      requireAuth, regis
 router.post('/:uuid/versions',                                requireAuth, addVersion)
 router.patch('/:uuid/versions/:version/requirements-url',     requireAuth, updateRequirementsUrl)
 router.patch('/:uuid/versions/:version/security',             requireAuth, updateSecurityData)
+router.post('/:uuid/versions/:version/aimbom',                requireAuth, generateAIMBOM)  
 
 export default router

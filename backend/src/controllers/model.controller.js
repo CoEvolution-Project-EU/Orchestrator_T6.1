@@ -1,6 +1,7 @@
 // src/controllers/model.controller.js
 import { Model } from '../models/models.model.js'
 import { File } from '../models/file.model.js'
+import { publishEvent } from '../config/kafka.js'
 
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
@@ -134,6 +135,10 @@ const getReports = async (req, res) => {
       'risk':       'risk_assessment_reports',
       'assessment': 'assessments',
       'defence':    'defences',
+      'gadgets':     'gadgets_reports',     
+      'aimodelinfo': 'aimodelinfo_reports', 
+      'euaiact':     'euaiact_reports',      
+      'datasets':    'datasets_reports',  
     }
 
     const field = fieldMap[type]
@@ -154,6 +159,105 @@ const getReports = async (req, res) => {
   }
 }
 
+// POST /api/v1/models/:uuid/versions/:version/aimbom
+const generateAIMBOM = async (req, res) => {
+  try {
+    const { uuid, version } = req.params
+
+    const model = await Model.findOne({ model_uuid: uuid })
+    if (!model) return res.status(404).json({ message: 'Model not found' })
+
+    const v = model.versioning.find(v => v.version === version)
+    if (!v) return res.status(404).json({ message: 'Version not found' })
+
+    // Get latest file for each report type
+    const latestRisk = await File.findOne({
+      model_uuid: uuid, version, pool: 'RP', bucket: 'risk-reports',
+    }).sort({ createdAt: -1 })
+    
+    const latestAssessment = await File.findOne({
+      model_uuid: uuid, version, pool: 'RP', bucket: 'assessment-reports',
+    }).sort({ createdAt: -1 })
+    
+    const latestDefence = await File.findOne({
+      model_uuid: uuid, version, pool: 'RP', bucket: 'defence-reports',
+    }).sort({ createdAt: -1 })
+    
+    const latestGadgets = await File.findOne({
+      model_uuid: uuid, version, pool: 'RP', bucket: 'gadgets-reports',
+    }).sort({ createdAt: -1 })
+    
+    const latestAiModelInfo = await File.findOne({
+      model_uuid: uuid, version, pool: 'RP', bucket: 'aimodelinfo-reports',
+    }).sort({ createdAt: -1 })
+    
+    const latestEuAiAct = await File.findOne({
+      model_uuid: uuid, version, pool: 'RP', bucket: 'euaiact-reports',
+    }).sort({ createdAt: -1 })
+    
+    const latestDatasets = await File.findOne({
+      model_uuid: uuid, version, pool: 'RP', bucket: 'datasets-reports',
+    }).sort({ createdAt: -1 })
+
+    // Check at least one report exists
+    if (!latestRisk && !latestAssessment && !latestDefence && 
+      !latestGadgets && !latestAiModelInfo && !latestEuAiAct && !latestDatasets) {
+    return res.status(404).json({
+      message: 'No reports found for this model version.'
+    })
+  }
+
+    // Build file info helper
+    const buildFileInfo = (doc) => {
+      if (!doc) return null
+      return {
+        _id:          doc._id,
+        bucket:       doc.bucket,
+        filename:     doc.filename,
+        download_url: `https://aegis.coevolution-project.eu/api/v1/files/download/${doc._id}`,
+        createdAt:    doc.createdAt,
+      }
+    }
+
+    // Publish to Kafka topic: strae
+    await publishEvent('strae', {
+      event:       'aimbom-requested',
+      model_name:  model.name,
+      model_uuid:  uuid,
+      version,
+      requestedBy: req.user?.username || 'backend',
+      requestedAt: new Date().toISOString(),
+      reports: {
+        risk_report:        buildFileInfo(latestRisk),
+        assessment_report:  buildFileInfo(latestAssessment),
+        defence_report:     buildFileInfo(latestDefence),
+        gadgets_report:     buildFileInfo(latestGadgets),
+        aimodelinfo_report: buildFileInfo(latestAiModelInfo),
+        euaiact_report:     buildFileInfo(latestEuAiAct),
+        datasets_report:    buildFileInfo(latestDatasets),
+      }
+    })
+
+    console.log(`[Kafka] AI-MBOM requested for model ${model.name} version ${version}`)
+
+    res.status(200).json({
+      message:     'AI-MBOM generation requested',
+      model_uuid:  uuid,
+      version,
+      reports: {
+        risk_report:        buildFileInfo(latestRisk),
+        assessment_report:  buildFileInfo(latestAssessment),
+        defence_report:     buildFileInfo(latestDefence),
+        gadgets_report:     buildFileInfo(latestGadgets),
+        aimodelinfo_report: buildFileInfo(latestAiModelInfo),
+        euaiact_report:     buildFileInfo(latestEuAiAct),
+        datasets_report:    buildFileInfo(latestDatasets),
+      }
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
 export {
   registerModel,
   getAllModels,
@@ -161,5 +265,6 @@ export {
   addVersion,
   updateRequirementsUrl,
   updateSecurityData,
-  getReports
+  getReports,
+  generateAIMBOM
 }

@@ -5,6 +5,7 @@ import express from "express"; //Bring Express into my project
 import userRouter from './routes/user.routes.js'; // routes import
 import modelsRouter from  './routes/models.routes.js';
 import filesRouter from './routes/files.routes.js' //minio
+import toolsRouter from './routes/tools.routes.js' //minio
 import cors from 'cors'
 //swagger
 import { readFileSync } from 'fs'
@@ -38,6 +39,7 @@ app.use("/api/v1/models", modelsRouter);
 
 
 app.use('/api/v1/files', filesRouter)
+app.use('/api/v1/tools', toolsRouter)
 
 // expample route example: http://localhost:4000/api/v1/users/registers
 

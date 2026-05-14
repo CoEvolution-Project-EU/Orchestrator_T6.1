@@ -170,7 +170,8 @@ tags:
     description: Security data updated by the orchestrator
   - name: Files
     description: General file operations across all MinIO pools
-
+  - name: Tools-Defences
+    description: Security tools registration and retrieval
 
 # ═══════════════════════════════════════════════════════════════
 # PATHS
@@ -693,4 +694,132 @@ paths:
         '404':
           description: File not found
 
-  
+  # ── Tools ────────────────────────────────────────────────────
+
+  /tools/register:
+    post:
+      tags: [Tools-Defences]
+      summary: Register a new tool (defence)
+      description: |
+        Registers a security tool (defence) with a GitHub URL.
+        **uploadedBy** is set automatically from the Keycloak token.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tool_id, tool_type, github_url]
+              properties:
+                tool_id:
+                  type: string
+                  example: TOOL-001
+                tool_type:
+                  type: string
+                  enum: [assessment, assessment_with_defence, defence]
+                  example: assessment
+                github_url:
+                  type: string
+                  example: https://github.com/coevolution/tool-001
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: [assessment, v1]
+            example:
+              tool_id: TOOL-001
+              tool_type: assessment
+              github_url: https://github.com/coevolution/tool-001
+              tags: [assessment, v1]
+      responses:
+        '201':
+          description: Tool registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Tool registered successfully
+                  tool:
+                    $ref: '#/components/schemas/Tool'
+        '400':
+          description: Missing required fields or tool_id already exists
+        '401':
+          description: No token provided or invalid token
+
+  /tools:
+    get:
+      tags: [Tools-Defences]
+      summary: Get all tools (defence)
+      description: Returns all tools. Filter by tool_type. Public.
+      parameters:
+        - name: tool_type
+          in: query
+          schema:
+            type: string
+            enum: [assessment, assessment_with_defence, defence]
+          description: Filter by tool type
+          example: assessment
+      responses:
+        '200':
+          description: List of tools
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 3
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Tool'
+
+  /tools/{tool_id}:
+    get:
+      tags: [Tools-Defences]
+      summary: Get tool by ID
+      description: Returns a single tool (defence) by its tool_id. Public.
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: TOOL-001
+      responses:
+        '200':
+          description: Tool found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tool:
+                    $ref: '#/components/schemas/Tool'
+        '404':
+          description: Tool not found
+
+    delete:
+      tags: [Tools-Defences]
+      summary: Delete a tool
+      description: Deletes a tool (defence) by its tool_id.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tool_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: TOOL-001
+      responses:
+        '200':
+          description: Tool deleted successfully
+        '404':
+          description: Tool not found

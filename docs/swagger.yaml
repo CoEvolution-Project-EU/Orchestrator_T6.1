@@ -357,7 +357,7 @@ paths:
             required: true
             schema:
               type: string
-              enum: [risk, assessment, defence]
+              enum: [risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom  ]
             example: risk
         responses:
           '200':
@@ -807,7 +807,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [assessment, assessment_with_defence, defence]
+            enum: [assessment, assessment_with_defence, defence, data_generator]
           description: Filter by tool type
           example: assessment
       responses:

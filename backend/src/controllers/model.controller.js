@@ -122,7 +122,7 @@ const getReports = async (req, res) => {
     const { uuid, version } = req.params
     const { type } = req.query
 
-    if (!type) return res.status(400).json({ message: 'type is required (risk, assessment, defence)' })
+    if (!type) return res.status(400).json({ message: 'type is required (risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom)' })
 
     const model = await Model.findOne({ model_uuid: uuid })
     if (!model) return res.status(404).json({ message: 'Model not found' })
@@ -143,7 +143,7 @@ const getReports = async (req, res) => {
     }
 
     const field = fieldMap[type]
-    if (!field) return res.status(400).json({ message: `Unknown type: ${type}. Use risk, assessment or defence` })
+    if (!field) return res.status(400).json({ message: `Unknown type: ${type}. Use risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom` })
 
     const fileIds = v[field]   // array of MongoDB file IDs
 

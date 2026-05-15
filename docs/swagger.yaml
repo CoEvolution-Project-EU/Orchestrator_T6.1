@@ -331,9 +331,14 @@ paths:
         description: |
           Returns files linked to this model version by report type.
           Uses the model's versioning array — not a general file search.
-          - risk → risk_assessment_reports[]
-          - assessment → assessments[]
-          - defence → defences[]
+          - risk        → risk_assessment_reports[]
+          - assessment  → assessments[]
+          - defence     → defences[]
+          - gadgets     → gadgets_reports[]
+          - aimodelinfo → aimodelinfo_reports[]
+          - euaiact     → euaiact_reports[]
+          - datasets    → datasets_reports[]
+          - aimbom      → ai_mbom[]
         parameters:
           - name: uuid
             in: path

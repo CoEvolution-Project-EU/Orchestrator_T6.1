@@ -12,7 +12,7 @@ const toolSchema = new Schema(
     tool_type: {
       type:     String,
       required: true,
-      enum:     ['assessment', 'assessment_with_defence', 'defence'],
+      enum:     ['assessment', 'assessment_with_defence', 'defence', 'data_generator'],
     },
     github_url: {
       type:     String,

@@ -9,6 +9,15 @@ const toolSchema = new Schema(
       unique:   true,    // no two tools with same id
       trim:     true,
     },
+    name: {
+      type:     String,
+      required: true,    // ← required — tool must have a name
+      trim:     true,
+    },
+    description: {
+      type: String,      // ← optional — free text
+      trim: true,
+    },
     tool_type: {
       type:     String,
       required: true,

@@ -17,6 +17,15 @@ const uploadFile = async (req, res) => {
     if (!pool || !bucket || !model_uuid || !version)
       return res.status(400).json({ message: 'pool, bucket, model_uuid, version are required' })
 
+    // model_uuid and version required for model buckets only
+    const dataBuckets = ['trusted-data']
+    const isDataFile = dataBuckets.includes(bucket)
+
+    if (!isDataFile && (!model_uuid || !version)) {
+      return res.status(400).json({
+        message: `model_uuid and version are required for bucket "${bucket}"`
+      })
+    }
     const client = getPool(pool)
     if (!client) return res.status(400).json({ message: `Unknown pool: ${pool}` })
 
@@ -29,7 +38,8 @@ const uploadFile = async (req, res) => {
     const uploadedDocs = []
 
     for (const file of files) {
-      const objectKey = `${model_uuid}-${version}-${file.originalname}`
+      
+      const objectKey = file.originalname
 
       await client.putObject(
         bucket,
@@ -42,8 +52,6 @@ const uploadFile = async (req, res) => {
       const doc = await File.create({
         pool,
         bucket,
-        model_uuid,
-        version,
         objectKey,
         filename:    file.originalname,
         size:        file.size,
@@ -58,22 +66,11 @@ const uploadFile = async (req, res) => {
       })
     }
 
-    // ── Special case: trusted-models bucket ──────────────────
-    // Update model.versioning.requirements_file and requirements_url
-    if (bucket === 'trusted-models' && files.length === 1) {
-      const model = await Model.findOne({ model_uuid })
-      if (model) {
-        const v = model.versioning.find(v => v.version === version)
-        if (v) {
-          v.requirements_file = files[0].originalname
-          v.requirements_url  = `https://aegis.coevolution-project.eu/api/v1/files/download/${uploadedDocs[0]._id}?pool=${pool}&bucket=${bucket}`
-          await model.save()
-        }
-      }
-    }
+
 
     // ── Auto-update model versioning for engine report buckets ─
     const reportBuckets = {
+      'model-requirements':      'requirements', 
       'risk-reports':       'risk_assessment_reports',
       'assessment-reports': 'assessments',
       'defence-reports':    'defences',
@@ -82,6 +79,9 @@ const uploadFile = async (req, res) => {
       'euaiact-reports':     'euaiact_reports',       
       'datasets-reports':    'datasets_reports',
       'ai-mbom':             'ai_mbom', 
+      'user-assessments':    'user_assessments',    
+      'user-defences':       'user_defences',       
+      'trusted-models': 'trusted_model',
     }
 
     const fieldToUpdate = reportBuckets[bucket]
@@ -97,10 +97,21 @@ const uploadFile = async (req, res) => {
         }
       }
     }
+    
+    if (bucket === 'trusted-models') {
+      const model = await Model.findOne({ model_uuid })
+      if (model) {
+        const v = model.versioning.find(v => v.version === version)
+        if (v) {
+          v.trusted = true    // ← auto-set trusted
+          await model.save()
+        }
+      }
+    }
 
     // ── Kafka topic map ───────────────────────────────────────
     const topicMap = {
-      'trusted-models':   'ragre_models',
+      'model-requirements':   'ragre_models',
       'user-assessments': 'assessment_reports',
       'user-defences':    'defence_reports'
       }
@@ -201,7 +212,8 @@ const searchFiles = async (req, res) => {
       'aimodelinfo': { pool: 'RP',  bucket: 'aimodelinfo-reports' }, 
       'euaiact':     { pool: 'RP',  bucket: 'euaiact-reports' },       
       'datasets':    { pool: 'RP',  bucket: 'datasets-reports' }, 
-      'requirements':    { pool: 'TRP', bucket: 'trusted-models' },
+      'requirements':    { pool: 'TRP', bucket: 'model-requirements' },
+      'aimbom':    { pool: 'SAP', bucket: 'ai-mbom' },
     }
 
     if (report_type) {

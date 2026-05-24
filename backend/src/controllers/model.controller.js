@@ -30,10 +30,15 @@ const registerModel = async (req, res) => {
   }
 }
 
-// ── Get all models ────────────────────────────────────────────
+// ── Get all models - user models ────────────────────────────────────────────
 const getAllModels = async (req, res) => {
   try {
-    const models = await Model.find().sort({ createdAt: -1 })
+    const { owner } = req.query
+    const query = {}
+
+    if (owner) query.owner = owner    // ← filter by owner if provided
+
+    const models = await Model.find(query).sort({ createdAt: -1 })
     res.status(200).json({ count: models.length, models })
   } catch (error) {
     res.status(500).json({ message: 'Server error', error })
@@ -116,13 +121,12 @@ const updateSecurityData = async (req, res) => {
 }
 
 
-// GET /api/v1/models/:uuid/versions/:version/reports?type=risk
 const getReports = async (req, res) => {
   try {
     const { uuid, version } = req.params
     const { type } = req.query
 
-    if (!type) return res.status(400).json({ message: 'type is required (risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom)' })
+    if (!type) return res.status(400).json({ message: 'type is required (risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence)' })
 
     const model = await Model.findOne({ model_uuid: uuid })
     if (!model) return res.status(404).json({ message: 'Model not found' })
@@ -130,31 +134,51 @@ const getReports = async (req, res) => {
     const v = model.versioning.find(v => v.version === version)
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    // Map type to schema field
     const fieldMap = {
-      'risk':       'risk_assessment_reports',
-      'assessment': 'assessments',
-      'defence':    'defences',
-      'gadgets':     'gadgets_reports',     
-      'aimodelinfo': 'aimodelinfo_reports', 
-      'euaiact':     'euaiact_reports',      
-      'datasets':    'datasets_reports',  
-      'aimbom':      'ai_mbom',  
+      'requirements':    'requirements', 
+      'risk':            'risk_assessment_reports',
+      'assessment':      'assessments',
+      'defence':         'defences',
+      'gadgets':         'gadgets_reports',
+      'aimodelinfo':     'aimodelinfo_reports',
+      'euaiact':         'euaiact_reports',
+      'datasets':        'datasets_reports',
+      'aimbom':          'ai_mbom',
+      'user-assessment': 'user_assessments',
+      'user-defence':    'user_defences',
     }
 
     const field = fieldMap[type]
-    if (!field) return res.status(400).json({ message: `Unknown type: ${type}. Use risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom` })
+    if (!field) return res.status(400).json({ message: `Unknown type: ${type}.` })
 
-    const fileIds = v[field]   // array of MongoDB file IDs
+    const fileIds = v[field]
 
     if (!fileIds || fileIds.length === 0) {
-      return res.status(200).json({ count: 0, files: [] })
+      return res.status(200).json({
+        model_name: model.name,    // ← add
+        model_uuid: uuid,          // ← add
+        version,                   // ← add
+        type,
+        count: 0,
+        files: []
+      })
     }
 
-    // Fetch the actual file documents from files collection
     const files = await File.find({ _id: { $in: fileIds } })
 
-    res.status(200).json({ count: files.length, files })
+    const enriched = files.map(f => ({
+      ...f.toObject(),
+      download_url: `https://aegis.coevolution-project.eu/api/v1/files/download/${f._id}`
+    }))
+
+    res.status(200).json({
+      model_name: model.name,    // ← add
+      model_uuid: uuid,          // ← add
+      version,                   // ← add
+      type,
+      count:      enriched.length,
+      files:      enriched,
+    })
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }

@@ -59,7 +59,7 @@ components:
           example: requirements.txt
         requirements_url:
           type: string
-          example: https://aegis.coevolution-project.eu/api/v1/models/uuid/versions/v1.0/requirements/download?pool=TRP&bucket=trusted-models
+          example: https://aegis.coevolution-project.eu/api/v1/models/uuid/versions/v1.0/requirements/download?pool=TRP&bucket=model-requirements
         attacks:
           type: array
           items:
@@ -153,6 +153,42 @@ components:
           type: string
           format: date-time
 
+    Tool:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        tool_id:
+          type: string
+          example: TOOL-001
+        name:
+          type: string
+          example: My Assessment Tool
+        description:
+          type: string
+          example: A tool for assessing AI model security
+        tool_type:
+          type: string
+          enum: [assessment, assessment_with_defence, defence, data_generator]
+          example: assessment
+        github_url:
+          type: string
+          example: https://github.com/coevolution/tool-001
+        uploadedBy:
+          type: string
+          example: coevolution_user
+        tags:
+          type: array
+          items:
+            type: string
+          example: [assessment, v1]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     Error:
       type: object
       properties:
@@ -184,7 +220,14 @@ paths:
     get:
       tags: [Models]
       summary: Get all models
-      description: Returns all registered models sorted by creation date. Public — no token required.
+      description: Returns all registered models sorted by creation date. Filter by owner. Public — no token required.
+      parameters:
+        - name: owner
+          in: query
+          schema:
+            type: string
+          example: coevolution_user
+          description: Filter by Keycloak username — returns only models belonging to this user
       responses:
         '200':
           description: List of models
@@ -331,14 +374,17 @@ paths:
         description: |
           Returns files linked to this model version by report type.
           Uses the model's versioning array — not a general file search.
-          - risk        → risk_assessment_reports[]
-          - assessment  → assessments[]
-          - defence     → defences[]
-          - gadgets     → gadgets_reports[]
-          - aimodelinfo → aimodelinfo_reports[]
-          - euaiact     → euaiact_reports[]
-          - datasets    → datasets_reports[]
-          - aimbom      → ai_mbom[]
+          - requirements    → requirements[]
+          - risk            → risk_assessment_reports[]
+          - assessment      → assessments[]
+          - defence         → defences[]
+          - gadgets         → gadgets_reports[]
+          - aimodelinfo     → aimodelinfo_reports[]
+          - euaiact         → euaiact_reports[]
+          - datasets        → datasets_reports[]
+          - aimbom          → ai_mbom[]
+          - user-assessment → user_assessments[]
+          - user-defence    → user_defences[]
         parameters:
           - name: uuid
             in: path
@@ -357,8 +403,7 @@ paths:
             required: true
             schema:
               type: string
-              enum: [risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom  ]
-            example: risk
+              enum: [requirements, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence]
         responses:
           '200':
             description: List of report files
@@ -516,11 +561,18 @@ paths:
         summary: Upload one or more files to any pool and bucket
         description: |
           Accepts 1 or more files. Saves each to MinIO and MongoDB.
+          model_uuid and version are required for all buckets EXCEPT trusted-data.
           Publishes ONE Kafka event based on bucket:
-          - `trusted-models`   → `ragre_models` (requirements → RAGRE)
-          - `user-assessments` → `assessment-uploaded` (user files → Engine)
-          - `user-defences`    → `defence-uploaded` (user files → Engine)
-          - `risk-reports`     → `risk-report-ready` (engine results → UI)
+          - `model-requirements`   → `ragre_models`
+          - `trusted-data`     → `data-uploaded` (no model needed)
+          - `user-assessments` → `assessment_reports`
+          - `user-defences`    → `defence_reports`
+          - `risk-reports`     → `risk-report-ready`
+          - `gadgets-reports`  → `gadgets-report-ready`
+          - `aimodelinfo-reports` → `aimodelinfo-report-ready`
+          - `euaiact-reports`  → `euaiact-report-ready`
+          - `datasets-reports` → `datasets-report-ready`
+          - `ai-mbom`          → `aimbom-ready`
         security:
           - bearerAuth: []
         requestBody:
@@ -529,37 +581,38 @@ paths:
             multipart/form-data:
               schema:
                 type: object
-                required: [files, pool, bucket, model_uuid, version]
+                required: [files, pool, bucket]
                 properties:
                   files:
-                    type: array
-                    items:
-                      type: string
-                      format: binary
-                    description: One or more files
+                    type: string
+                    format: binary
+                    description: One or more files — use field name "files" for each
                   pool:
                     type: string
                     enum: [SAP, RP, TRP, AP, STRDP]
                     example: TRP
                   bucket:
                     type: string
-                    example: trusted-models
+                    example: model-requirements
                     description: |
-                      TRP pool:
-                        trusted-models
-                      RP pool:
+                      TRP pool (model required):
+                        model-requirements
+                      TRP pool (no model needed):
+                        trusted-data
+                      RP pool (model required):
                         risk-reports, assessment-reports, defence-reports,
-                        gadgets-reports, aimodelinfo-reports, euaiact-reports, datasets-reports
-                      SAP pool:
+                        gadgets-reports, aimodelinfo-reports, euaiact-reports,
+                        datasets-reports, user-assessments, user-defences
+                      SAP pool (model required):
                         ai-mbom
-                      User uploads (RP pool):
-                        user-assessments, user-defences
                   model_uuid:
                     type: string
                     example: 550e8400-e29b-41d4-a716-446655440000
+                    description: Required for all buckets except trusted-data
                   version:
                     type: string
                     example: v1.0
+                    description: Required for all buckets except trusted-data
                   tags:
                     type: string
                     description: comma-separated tags
@@ -649,7 +702,7 @@ paths:
               - aimodelinfo → RP/aimodelinfo-reports
               - euaiact     → RP/euaiact-reports
               - datasets    → RP/datasets-reports
-              - requirements     → TRP/trusted-models
+              - requirements     → TRP/model-requirements
               - aimbom      → SAP/ai-mbom
             example: risk
         responses:
@@ -762,9 +815,15 @@ paths:
                 tool_id:
                   type: string
                   example: TOOL-001
+                name:
+                  type: string
+                  example: My Assessment Tool
+                description:
+                  type: string
+                  example: A tool for assessing AI model security
                 tool_type:
                   type: string
-                  enum: [assessment, assessment_with_defence, defence]
+                  enum: [assessment, assessment_with_defence, defence, data_generator]
                   example: assessment
                 github_url:
                   type: string
@@ -776,6 +835,8 @@ paths:
                   example: [assessment, v1]
             example:
               tool_id: TOOL-001
+              name: My Assessment Tool
+              description: A tool for assessing AI model security
               tool_type: assessment
               github_url: https://github.com/coevolution/tool-001
               tags: [assessment, v1]

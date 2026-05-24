@@ -9,13 +9,6 @@ const versioningSchema = new Schema(
         type: String,
         required: true,
       },
-      
-      requirements_file: {
-        type: String,              // original filename uploaded by user
-      },
-      requirements_url: {
-        type: String,              // MinIO bucket URL, set by orchestrator after upload
-      },
       description: {
         type: String,              // free text by user
       },
@@ -56,6 +49,10 @@ const versioningSchema = new Schema(
          type: [String], 
          default: [] 
         },
+      user_assessments: { type: [String], default: [] },   
+      user_defences:    { type: [String], default: [] }, 
+      requirements: { type: [String], default: [] },
+      trusted_model: { type: [String], default: [] }, 
     },
     {
         timestamps: true

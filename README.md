@@ -58,7 +58,7 @@ Node.js Backend (port 4000)
 
 ```
 Step 1 — User registers model + uploads requirements file
-         → MinIO TRP/trusted-models
+         → MinIO TRP/model-requirements
          → MongoDB: models + files collections
          → Kafka: ragre_models
                   ↓
@@ -213,7 +213,7 @@ Authorization: Bearer <access_token>
 ```
 file   → the requirements file
 pool   → TRP
-bucket → trusted-models
+bucket → model-requirements
 ```
 
 
@@ -265,7 +265,7 @@ Authorization: Bearer <token>
 # 2. Upload requirements file
 POST /api/v1/models/<uuid>/versions/v1.0/requirements
 Authorization: Bearer <token>
-form-data: file=requirements.txt, pool=TRP, bucket=trusted-models
+form-data: file=requirements.txt, pool=TRP, bucket=model-requirements
 ```
 
 Kafka publishes: `ragre_models`
@@ -317,7 +317,7 @@ Kafka publishes: `assessment-uploaded`
 | RP    | assessment-reports |  |
 | RP    | defence-reports |  |
 | TRP   | trusted-data |  |
-| TRP   | trusted-models |  |
+| TRP   | model-requirements |  |
 | AP    | assessment-libraries | |
 | AP    | assessment-tools |  |
 | STRDP | defence-libraries |  |
@@ -342,9 +342,9 @@ Kafka publishes: `assessment-uploaded`
   "modelUuid": "550e8400-e29b-41d4-a716-446655440000",
   "version": "v1.0",
   "pool": "TRP",
-  "bucket": "trusted-models",
+  "bucket": "model-requirements",
   "filename": "requirements.txt",
-  "requirements_url": "https://aegis.coevolution-project.eu/api/v1/models/.../requirements/download?pool=TRP&bucket=trusted-models",
+  "requirements_url": "https://aegis.coevolution-project.eu/api/v1/models/.../requirements/download?pool=TRP&bucket=model-requirements",
   "uploadedAt": "2026-04-24T10:00:00.000Z"
 }
 ```

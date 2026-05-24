@@ -52,7 +52,7 @@ export async function initMinIO() {
   const buckets = {
     SAP:   ['ai-mbom'],
     RP:    ['risk-reports','assessment-reports','defence-reports','user-assessment-reports','user-defence-reports','gadgets-reports','aimodelinfo-reports','euaiact-reports','datasets-reports'],
-    TRP:   ['trusted-data', 'trusted-models'],
+    TRP:   ['trusted-data', 'model-requirements'],
     AP:    ['assessment-libraries','assessment-tools'],
     STRDP: ['defence-libraries','design-train-defence-tools','deployment-test-defence-tools'],
   }

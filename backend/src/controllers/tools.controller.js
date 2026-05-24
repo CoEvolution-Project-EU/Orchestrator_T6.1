@@ -5,17 +5,19 @@ import { Tool } from '../models/tools.model.js'
 // POST /api/v1/tools/register
 const registerTool = async (req, res) => {
   try {
-    const { tool_id, tool_type, github_url, tags } = req.body
+    const { tool_id, name, description, tool_type, github_url, tags } = req.body
 
     // Validate required fields
-    if (!tool_id || !tool_type || !github_url) {
+    if (!tool_id || !name  || !tool_type || !github_url) {
       return res.status(400).json({
-        message: 'tool_id, tool_type and github_url are required'
+        message: 'tool_id, name, tool_type and github_url are required'
       })
     }
 
     const tool = await Tool.create({
       tool_id,
+      name,
+      description,
       tool_type,
       github_url,
       uploadedBy: req.user.username,  // from Keycloak token — never from body

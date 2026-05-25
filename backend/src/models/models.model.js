@@ -81,6 +81,19 @@ const postSchema = new Schema (
             type: String,
             required: true         // dropdown selection by user
         },
+        model_paradigm: {
+          type: String,        
+        },
+        architecture_family: {
+          type: String,       
+        },
+        framework: {
+          type: String,        
+        },
+        input_modality: {
+          type:    [String],   
+          default: [],
+        },
         versioning: {
             type: [versioningSchema],
             required: true         // dropdown selection by user

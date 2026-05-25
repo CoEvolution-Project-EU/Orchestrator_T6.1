@@ -6,7 +6,7 @@ import { publishEvent } from '../config/kafka.js'
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
   try {
-    const { name, type, versioning } = req.body;
+    const { name, type, versioning ,model_paradigm, architecture_family, framework, input_modality } = req.body;
 
     if (!name || !type || !versioning) {
       return res.status(400).json({
@@ -18,6 +18,10 @@ const registerModel = async (req, res) => {
       name,
       owner:      req.user.username, // from Keycloak token — never from body
       type,
+      model_paradigm,
+      architecture_family,
+      framework,
+      input_modality,
       versioning
     });
 

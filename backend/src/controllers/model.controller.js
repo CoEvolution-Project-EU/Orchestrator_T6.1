@@ -271,42 +271,29 @@ const generateAIMBOM = async (req, res) => {
     const v = model.versioning.find(v => v.version === version)
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    // Get latest file for each report type
-    const latestRisk = await File.findOne({
-      model_uuid: uuid, version, pool: 'RP', bucket: 'risk-reports',
-    }).sort({ createdAt: -1 })
-    
-    const latestAssessment = await File.findOne({
-      model_uuid: uuid, version, pool: 'RP', bucket: 'assessment-reports',
-    }).sort({ createdAt: -1 })
-    
-    const latestDefence = await File.findOne({
-      model_uuid: uuid, version, pool: 'RP', bucket: 'defence-reports',
-    }).sort({ createdAt: -1 })
-    
-    const latestGadgets = await File.findOne({
-      model_uuid: uuid, version, pool: 'RP', bucket: 'gadgets-reports',
-    }).sort({ createdAt: -1 })
-    
-    const latestAiModelInfo = await File.findOne({
-      model_uuid: uuid, version, pool: 'RP', bucket: 'aimodelinfo-reports',
-    }).sort({ createdAt: -1 })
-    
-    const latestEuAiAct = await File.findOne({
-      model_uuid: uuid, version, pool: 'RP', bucket: 'euaiact-reports',
-    }).sort({ createdAt: -1 })
-    
-    const latestDatasets = await File.findOne({
-      model_uuid: uuid, version, pool: 'RP', bucket: 'datasets-reports',
-    }).sort({ createdAt: -1 })
+    // Helper — get latest file from a versioning array
+    const getLatest = async (fileIds) => {
+      if (!fileIds || fileIds.length === 0) return null
+      const files = await File.find({ _id: { $in: fileIds } }).sort({ createdAt: -1 })
+      return files[0] || null
+    }
+
+    // Get latest file for each report type from model versioning arrays
+    const latestRisk        = await getLatest(v.risk_assessment_reports)
+    const latestAssessment  = await getLatest(v.assessments)
+    const latestDefence     = await getLatest(v.defences)
+    const latestGadgets     = await getLatest(v.gadgets_reports)
+    const latestAiModelInfo = await getLatest(v.aimodelinfo_reports)
+    const latestEuAiAct     = await getLatest(v.euaiact_reports)
+    const latestDatasets    = await getLatest(v.datasets_reports)
 
     // Check at least one report exists
-    if (!latestRisk && !latestAssessment && !latestDefence && 
-      !latestGadgets && !latestAiModelInfo && !latestEuAiAct && !latestDatasets) {
-    return res.status(404).json({
-      message: 'No reports found for this model version.'
-    })
-  }
+    if (!latestRisk && !latestAssessment && !latestDefence &&
+        !latestGadgets && !latestAiModelInfo && !latestEuAiAct && !latestDatasets) {
+      return res.status(404).json({
+        message: 'No reports found for this model version.'
+      })
+    }
 
     // Build file info helper
     const buildFileInfo = (doc) => {
@@ -320,6 +307,16 @@ const generateAIMBOM = async (req, res) => {
       }
     }
 
+    const reports = {
+      risk_report:        buildFileInfo(latestRisk),
+      assessment_report:  buildFileInfo(latestAssessment),
+      defence_report:     buildFileInfo(latestDefence),
+      gadgets_report:     buildFileInfo(latestGadgets),
+      aimodelinfo_report: buildFileInfo(latestAiModelInfo),
+      euaiact_report:     buildFileInfo(latestEuAiAct),
+      datasets_report:    buildFileInfo(latestDatasets),
+    }
+
     // Publish to Kafka topic: strae
     await publishEvent('strae', {
       event:       'aimbom-requested',
@@ -328,32 +325,16 @@ const generateAIMBOM = async (req, res) => {
       version,
       requestedBy: req.user?.username || 'backend',
       requestedAt: new Date().toISOString(),
-      reports: {
-        risk_report:        buildFileInfo(latestRisk),
-        assessment_report:  buildFileInfo(latestAssessment),
-        defence_report:     buildFileInfo(latestDefence),
-        gadgets_report:     buildFileInfo(latestGadgets),
-        aimodelinfo_report: buildFileInfo(latestAiModelInfo),
-        euaiact_report:     buildFileInfo(latestEuAiAct),
-        datasets_report:    buildFileInfo(latestDatasets),
-      }
+      reports,
     })
 
     console.log(`[Kafka] AI-MBOM requested for model ${model.name} version ${version}`)
 
     res.status(200).json({
-      message:     'AI-MBOM generation requested',
-      model_uuid:  uuid,
+      message:    'AI-MBOM generation requested',
+      model_uuid: uuid,
       version,
-      reports: {
-        risk_report:        buildFileInfo(latestRisk),
-        assessment_report:  buildFileInfo(latestAssessment),
-        defence_report:     buildFileInfo(latestDefence),
-        gadgets_report:     buildFileInfo(latestGadgets),
-        aimodelinfo_report: buildFileInfo(latestAiModelInfo),
-        euaiact_report:     buildFileInfo(latestEuAiAct),
-        datasets_report:    buildFileInfo(latestDatasets),
-      }
+      reports,
     })
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })

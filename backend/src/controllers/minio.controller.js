@@ -14,10 +14,10 @@ const uploadFile = async (req, res) => {
 
     if (!files || files.length === 0)
       return res.status(400).json({ message: 'At least one file is required' })
-    if (!pool || !bucket || !model_uuid || !version)
-      return res.status(400).json({ message: 'pool, bucket, model_uuid, version are required' })
+    if (!pool || !bucket )
+      return res.status(400).json({ message: 'pool, bucket ' })
 
-    // model_uuid and version required for model buckets only
+    // check data bucket FIRST
     const dataBuckets = ['trusted-data']
     const isDataFile = dataBuckets.includes(bucket)
 

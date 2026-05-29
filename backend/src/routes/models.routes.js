@@ -10,6 +10,7 @@ import {
   updateRequirementsUrl,
   updateSecurityData,
   getReports,
+  getReportsAll,
   generateAIMBOM
 } from '../controllers/model.controller.js'
 
@@ -18,8 +19,10 @@ const upload = multer({ storage: multer.memoryStorage() })
 
 // Public
 router.get('/',      getAllModels)
+router.get('/reports', getReportsAll)
 router.get('/:uuid', getModelByUUID)
 router.get('/:uuid/versions/:version/reports', getReports)
+
 
 
 // Protected — require Keycloak token

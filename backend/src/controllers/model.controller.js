@@ -188,6 +188,78 @@ const getReports = async (req, res) => {
   }
 }
 
+// GET /api/v1/models/reports?type=aimbom&owner=coevolution_user
+// GET /api/v1/models/reports?type=risk&uuid=550e8400-...&version=v1.0
+const getReportsAll = async (req, res) => {
+  try {
+    const { type, uuid, version, owner } = req.query
+
+    if (!type) return res.status(400).json({ message: 'type is required' })
+
+    const fieldMap = {
+      'requirements':    'requirements',
+      'trusted-model':   'trusted_model',
+      'risk':            'risk_assessment_reports',
+      'assessment':      'assessments',
+      'defence':         'defences',
+      'gadgets':         'gadgets_reports',
+      'aimodelinfo':     'aimodelinfo_reports',
+      'euaiact':         'euaiact_reports',
+      'datasets':        'datasets_reports',
+      'aimbom':          'ai_mbom',
+      'user-assessment': 'user_assessments',
+      'user-defence':    'user_defences',
+    }
+
+    const field = fieldMap[type]
+    if (!field) return res.status(400).json({ message: `Unknown type: ${type}` })
+
+    // Build model query
+    const modelQuery = {}
+    if (uuid)  modelQuery.model_uuid = uuid
+    if (owner) modelQuery.owner      = owner
+
+    const models = await Model.find(modelQuery).sort({ createdAt: -1 })
+
+    const result = []
+
+    for (const model of models) {
+      for (const v of model.versioning) {
+
+        // Filter by version if provided
+        if (version && v.version !== version) continue
+
+        const fileIds = v[field]
+        if (!fileIds || fileIds.length === 0) continue
+
+        const files = await File.find({ _id: { $in: fileIds } })
+
+        const enriched = files.map(f => ({
+          ...f.toObject(),
+          download_url: `https://aegis.coevolution-project.eu/api/v1/files/download/${f._id}`
+        }))
+
+        result.push({
+          model_name: model.name,
+          model_uuid: model.model_uuid,
+          owner:      model.owner,
+          version:    v.version,
+          type,
+          count:      enriched.length,
+          files:      enriched,
+        })
+      }
+    }
+
+    res.status(200).json({
+      total:   result.length,
+      reports: result,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
 // POST /api/v1/models/:uuid/versions/:version/aimbom
 const generateAIMBOM = async (req, res) => {
   try {
@@ -295,5 +367,6 @@ export {
   updateRequirementsUrl,
   updateSecurityData,
   getReports,
+  getReportsAll,
   generateAIMBOM
 }

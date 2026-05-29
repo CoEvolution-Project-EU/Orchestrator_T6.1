@@ -288,6 +288,90 @@ paths:
                     items:
                       $ref: '#/components/schemas/Model'
 
+
+  /models/reports:
+      get:
+        tags: [Models]
+        summary: Get reports across all models
+        description: |
+          Returns report files across all models and versions.
+          All parameters are optional — combine them to filter results.
+          
+          **Examples:**
+          - All AI-MBOMs for a user: `?type=aimbom&owner=coevolution_user`
+          - All risk reports for a model: `?type=risk&uuid=550e8400-...`
+          - Specific model + version: `?type=risk&uuid=550e8400-...&version=v1.0`
+          - All AI-MBOMs across all models: `?type=aimbom`
+        parameters:
+          - name: type
+            in: query
+            required: true
+            schema:
+              type: string
+              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence]
+            example: aimbom
+            description: Report type — required
+          - name: owner
+            in: query
+            schema:
+              type: string
+            example: coevolution_user
+            description: Filter by Keycloak username
+          - name: uuid
+            in: query
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+            description: Filter by model UUID
+          - name: version
+            in: query
+            schema:
+              type: string
+            example: v1.0
+            description: Filter by version
+        responses:
+          '200':
+            description: Reports grouped by model and version
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    total:
+                      type: integer
+                      example: 2
+                    reports:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          model_name:
+                            type: string
+                            example: MySecurityModel
+                          model_uuid:
+                            type: string
+                            example: 550e8400-e29b-41d4-a716-446655440000
+                          owner:
+                            type: string
+                            example: coevolution_user
+                          version:
+                            type: string
+                            example: v1.0
+                          type:
+                            type: string
+                            example: aimbom
+                          count:
+                            type: integer
+                            example: 1
+                          files:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/File'
+          '400':
+            description: type is required
+
+
+
   /models/register:
     post:
       tags: [Models]

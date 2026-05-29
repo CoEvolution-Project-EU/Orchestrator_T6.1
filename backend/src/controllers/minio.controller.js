@@ -201,19 +201,24 @@ const searchFiles = async (req, res) => {
     const { model_uuid, version, report_type } = req.query
     const query = {}
 
-    if (model_uuid)  query.model_uuid = model_uuid
-    if (version)     query.version    = version
+    // Search by objectKey pattern if model_uuid or version provided
+    if (model_uuid && version) {
+      query.objectKey = { $regex: `^${model_uuid}-${version}-` }
+    } else if (model_uuid) {
+      query.objectKey = { $regex: `^${model_uuid}-` }
+    }
 
     const reportTypeMap = {
-      'risk':       { pool: 'RP',  bucket: 'risk-reports' },
-      'assessment': { pool: 'RP',  bucket: 'assessment-reports' },
-      'defence':    { pool: 'RP',  bucket: 'defence-reports' },
-      'gadgets':     { pool: 'RP',  bucket: 'gadgets-reports' },      
-      'aimodelinfo': { pool: 'RP',  bucket: 'aimodelinfo-reports' }, 
-      'euaiact':     { pool: 'RP',  bucket: 'euaiact-reports' },       
-      'datasets':    { pool: 'RP',  bucket: 'datasets-reports' }, 
-      'requirements':    { pool: 'TRP', bucket: 'model-requirements' },
-      'aimbom':    { pool: 'SAP', bucket: 'ai-mbom' },
+      'risk':         { pool: 'RP',  bucket: 'risk-reports' },
+      'assessment':   { pool: 'RP',  bucket: 'assessment-reports' },
+      'defence':      { pool: 'RP',  bucket: 'defence-reports' },
+      'gadgets':      { pool: 'RP',  bucket: 'gadgets-reports' },
+      'aimodelinfo':  { pool: 'RP',  bucket: 'aimodelinfo-reports' },
+      'euaiact':      { pool: 'RP',  bucket: 'euaiact-reports' },
+      'datasets':     { pool: 'RP',  bucket: 'datasets-reports' },
+      'requirements': { pool: 'TRP', bucket: 'model-requirements' },
+      'aimbom':       { pool: 'SAP', bucket: 'ai-mbom' },
+      'data':         { pool: 'TRP', bucket: 'trusted-data' },
     }
 
     if (report_type) {

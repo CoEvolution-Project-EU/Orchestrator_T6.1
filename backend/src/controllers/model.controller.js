@@ -14,6 +14,10 @@ const registerModel = async (req, res) => {
       });
     }
 
+    const hardcodedUUIDs = {
+      'automotive_model_P2': 'd1054483-3d4a-43c0-a181-d7ecff862b2d',
+    }
+
     const model = await Model.create({
       name,
       owner:      req.user.username, // from Keycloak token — never from body
@@ -22,8 +26,10 @@ const registerModel = async (req, res) => {
       architecture_family,
       framework,
       input_modality,
-      versioning
-    });
+      versioning,
+      // use hardcoded UUID if name matches, otherwise auto-generate
+      ...(hardcodedUUIDs[name] && { model_uuid: hardcodedUUIDs[name] }),
+    })
 
     res.status(201).json({
       message: "Model has been registered",

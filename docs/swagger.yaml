@@ -219,6 +219,16 @@ components:
         github_url:
           type: string
           example: https://github.com/coevolution/tool-001
+        defence_flows:
+          type: array
+          items:
+            type: string
+          example: [image, text]
+        attacks_vulnerabilities:
+          type: array
+          items:
+            type: string
+          example: [image, text]
         uploadedBy:
           type: string
           example: coevolution_user
@@ -887,11 +897,21 @@ paths:
                   example: A tool for assessing AI model security
                 tool_type:
                   type: string
-                  enum: [assessment, assessment_with_defence, defence, data_generator]
+                  enum: [assessment, assessment_with_defence, defence, data_generator, gadgets]
                   example: assessment
                 github_url:
                   type: string
                   example: https://github.com/coevolution/tool-001
+                defence_flows:
+                  type: array
+                  items:
+                    type: string
+                  example: [image, text]
+                attacks_vulnerabilities:
+                  type: array
+                  items:
+                    type: string
+                  example: [image, text]
                 tags:
                   type: array
                   items:
@@ -902,6 +922,8 @@ paths:
               name: My Assessment Tool
               description: A tool for assessing AI model security
               tool_type: assessment
+              defence_flows: []
+              attacks_vulnerabilities: []
               github_url: https://github.com/coevolution/tool-001
               tags: [assessment, v1]
       responses:
@@ -932,7 +954,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [assessment, assessment_with_defence, defence, data_generator]
+            enum: [assessment, assessment_with_defence, defence, data_generator, gadgets]
           description: Filter by tool type
           example: assessment
       responses:

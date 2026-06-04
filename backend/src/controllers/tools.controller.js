@@ -5,7 +5,7 @@ import { Tool } from '../models/tools.model.js'
 // POST /api/v1/tools/register
 const registerTool = async (req, res) => {
   try {
-    const { tool_id, name, description, tool_type, github_url, tags } = req.body
+    const { tool_id, name, description, tool_type, github_url,defence_flows,attacks_vulnerabilities, tags } = req.body
 
     // Validate required fields
     if (!tool_id || !name  || !tool_type || !github_url) {
@@ -20,6 +20,8 @@ const registerTool = async (req, res) => {
       description,
       tool_type,
       github_url,
+      defence_flows:           defence_flows           || [],
+      attacks_vulnerabilities: attacks_vulnerabilities || [],
       uploadedBy: req.user.username,  // from Keycloak token — never from body
       tags:       tags || [],
     })

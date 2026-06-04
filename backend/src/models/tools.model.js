@@ -18,10 +18,18 @@ const toolSchema = new Schema(
       type: String,      // ← optional — free text
       trim: true,
     },
+    defence_flows: { // array of strings
+      type:    [String],   
+      default: [],
+    },
+    attacks_vulnerabilities: { // array of strings
+      type:    [String],   
+      default: [],
+    },
     tool_type: {
       type:     String,
       required: true,
-      enum:     ['assessment', 'assessment_with_defence', 'defence', 'data_generator'],
+      enum:     ['assessment', 'assessment_with_defence', 'defence', 'data_generator', 'gadgets'], // add gadgets
     },
     github_url: {
       type:     String,

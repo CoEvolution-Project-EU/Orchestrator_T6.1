@@ -294,8 +294,8 @@ const generateAIMBOM = async (req, res) => {
     const latestDatasets    = await getLatest(v.datasets_reports)
 
     // Check at least one report exists
-    if (!latestRisk && !latestAssessment && !latestDefence &&
-        !latestGadgets && !latestAiModelInfo && !latestEuAiAct && !latestDatasets) {
+    if (!latestRisk || !latestAssessment || !latestDefence &&
+        !latestGadgets || !latestAiModelInfo || !latestEuAiAct || !latestDatasets) {
       return res.status(404).json({
         message: 'No reports found for this model version.'
       })

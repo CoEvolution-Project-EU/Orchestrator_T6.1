@@ -183,9 +183,7 @@ const uploadFile = async (req, res) => {
     
       // 6. Check if any have the same base name
       const matches = existingFiles.filter(f =>
-        f.filename === filename ||
-        f.filename.startsWith(base + '_') ||
-        f.filename.startsWith(base + '.')
+        f.filename === filename
       )
       if (matches.length === 0) return filename
     

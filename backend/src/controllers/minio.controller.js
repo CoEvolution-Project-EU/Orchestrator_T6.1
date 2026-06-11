@@ -5,7 +5,7 @@ import { getPool } from '../config/minio.js'
 import { File } from '../models/file.model.js'
 import { Model } from '../models/models.model.js' 
 import { publishEvent } from '../config/kafka.js'
-
+import path from 'path'
 
 const uploadFile = async (req, res) => {
   try {
@@ -39,7 +39,7 @@ const uploadFile = async (req, res) => {
 
     for (const file of files) {
       
-      const objectKey = file.originalname
+      const objectKey = await getSafeName(file.originalname, bucket, model_uuid, version)
 
       await client.putObject(
         bucket,
@@ -53,7 +53,7 @@ const uploadFile = async (req, res) => {
         pool,
         bucket,
         objectKey,
-        filename:    file.originalname,
+        filename:    objectKey,
         size:        file.size,
         contentType: file.mimetype,
         uploadedBy:  req.user?.username || 'backend',
@@ -68,21 +68,7 @@ const uploadFile = async (req, res) => {
 
 
 
-    // ── Auto-update model versioning for engine report buckets ─
-    const reportBuckets = {
-      'model-requirements':      'requirements', 
-      'risk-reports':       'risk_assessment_reports',
-      'assessment-reports': 'assessments',
-      'defence-reports':    'defences',
-      'gadgets-reports':     'gadgets_reports',       
-      'aimodelinfo-reports': 'aimodelinfo_reports',  
-      'euaiact-reports':     'euaiact_reports',       
-      'datasets-reports':    'datasets_reports',
-      'ai-mbom':             'ai_mbom', 
-      'user-assessments':    'user_assessments',    
-      'user-defences':       'user_defences',       
-      'trusted-models': 'trusted_model',
-    }
+
 
     const fieldToUpdate = reportBuckets[bucket]
     if (fieldToUpdate) {
@@ -156,8 +142,57 @@ const uploadFile = async (req, res) => {
   }
 }
 
+    // ── Auto-update model versioning for engine report buckets ─
+    const reportBuckets = {
+      'model-requirements':      'requirements', 
+      'risk-reports':       'risk_assessment_reports',
+      'assessment-reports': 'assessments',
+      'defence-reports':    'defences',
+      'gadgets-reports':     'gadgets_reports',       
+      'aimodelinfo-reports': 'aimodelinfo_reports',  
+      'euaiact-reports':     'euaiact_reports',       
+      'datasets-reports':    'datasets_reports',
+      'ai-mbom':             'ai_mbom', 
+      'user-assessments':    'user_assessments',    
+      'user-defences':       'user_defences',       
+      'trusted-models': 'trusted_model',
+    }
 
-
+    const getSafeName = async (filename, bucket, model_uuid, version) => {
+      const ext  = path.extname(filename)
+      const base = path.basename(filename, ext)
+    
+      // 1. Find the model
+      const model = await Model.findOne({ model_uuid })
+      if (!model) return filename
+    
+      // 2. Find the version
+      const v = model.versioning.find(v => v.version === version)
+      if (!v) return filename
+    
+      // 3. Get the correct array field for this bucket
+      const field = reportBuckets[bucket]
+      if (!field) return filename
+    
+      // 4. Get all file IDs already stored in this version's array
+      const fileIds = v[field]
+      if (!fileIds || fileIds.length === 0) return filename
+    
+      // 5. Fetch those files from MongoDB
+      const existingFiles = await File.find({ _id: { $in: fileIds } })
+    
+      // 6. Check if any have the same base name
+      const matches = existingFiles.filter(f =>
+        f.filename === filename ||
+        f.filename.startsWith(base + '_') ||
+        f.filename.startsWith(base + '.')
+      )
+      if (matches.length === 0) return filename
+    
+      // 7. Generate next suffix
+      const pad = String(matches.length).padStart(2, '0')
+      return `${base}_${pad}${ext}`
+    }
 
 
 // ── Download a file ───────────────────────────────────────────

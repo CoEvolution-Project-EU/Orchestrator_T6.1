@@ -3,7 +3,7 @@ openapi: 3.0.0
 info:
   title: CoEvolution Orchestrator API
   description: |
-    Backend API for the CoEvolution AEGIS Testbed.
+    Backend API for the CoEvolution AEGIS Testbed .
     Handles model registration, file storage across MinIO pools, and real-time Kafka notifications.
     
     ## Authentication

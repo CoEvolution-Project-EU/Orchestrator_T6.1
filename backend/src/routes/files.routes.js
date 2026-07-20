@@ -10,6 +10,7 @@ import {
   deleteFile,
 } from '../controllers/minio.controller.js'
 import { requireAuth } from '../middleware/keycloak.middleware.js'  
+import { restrictPilotBucket } from '../middleware/pilotBucket.middleware.js'
 
 const router = Router()
 
@@ -17,7 +18,8 @@ const router = Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
 // Protected — require Keycloak token
-router.post('/upload', requireAuth, upload.array('files', 20), uploadFile)
+
+router.post('/upload', requireAuth, upload.array('files', 20), restrictPilotBucket, uploadFile)
 router.get('/url/:id',      requireAuth, getPresignedUrl)
 router.delete('/:id',       requireAuth, deleteFile)
 

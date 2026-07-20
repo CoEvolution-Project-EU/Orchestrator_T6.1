@@ -71,7 +71,7 @@ const uploadFile = async (req, res) => {
       return res.status(400).json({ message: 'pool, bucket ' })
 
     // check data bucket FIRST
-    const dataBuckets = ['trusted-data']
+    const dataBuckets = ['trusted-data','siemens-data', 'avl-data', 'avi-data']
     const isDataFile = dataBuckets.includes(bucket)
 
     if (!isDataFile && (!model_uuid || !version)) {

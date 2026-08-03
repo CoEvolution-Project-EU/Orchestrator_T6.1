@@ -53,9 +53,14 @@ const startServer = async () => {
 
   // 4 — Start Express server last (all connections are ready)
   // Use .env PORT or fallback to 4000
-  app.listen(process.env.PORT || 4000, () => {
+  const server = app.listen(process.env.PORT || 4000, () => {
     console.log(`Server is running at port: ${process.env.PORT}`)
   })
+  
+  // Align Node's request timeout with nginx's 600s proxy timeout,
+  // so large file uploads aren't killed by Node's 5-minute default
+  server.requestTimeout = 1200000   // 20 minutes, in milliseconds
+  server.headersTimeout = 1205000
 }
 
 // Run everything — this actually starts your app

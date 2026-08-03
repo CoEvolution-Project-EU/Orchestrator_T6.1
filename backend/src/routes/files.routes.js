@@ -11,11 +11,13 @@ import {
 } from '../controllers/minio.controller.js'
 import { requireAuth } from '../middleware/keycloak.middleware.js'  
 import { restrictPilotBucket } from '../middleware/pilotBucket.middleware.js'
+import os from 'os'
 
 const router = Router()
 
 // multer stores file in memory (buffer) — we pass it to MinIO directly
-const upload = multer({ storage: multer.memoryStorage() })
+const upload = multer({ dest: os.tmpdir() })
+
 
 // Protected — require Keycloak token
 

@@ -6,7 +6,7 @@ import { File } from '../models/file.model.js'
 import { Model } from '../models/models.model.js' 
 import { publishEvent } from '../config/kafka.js'
 import path from 'path'
-
+import fs from 'fs'
 
 
     // ── Auto-update model versioning for engine report buckets ─
@@ -93,14 +93,18 @@ const uploadFile = async (req, res) => {
     for (const file of files) {
       
       const objectKey = await getSafeName(file.originalname, bucket, model_uuid, version)
+      const fileStream = fs.createReadStream(file.path)
 
       await client.putObject(
         bucket,
         objectKey,
-        file.buffer,
+        fileStream,
         file.size,
         { 'Content-Type': file.mimetype }
       )
+      fs.unlink(file.path, (err) => {
+        if (err) console.error(`Failed to delete temp file ${file.path}:`, err.message)
+      })
 
       const doc = await File.create({
         pool,

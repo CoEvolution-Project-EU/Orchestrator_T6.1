@@ -284,22 +284,6 @@ const generateAIMBOM = async (req, res) => {
       return files[0] || null
     }
 
-    // Get latest file for each report type from model versioning arrays
-    const latestRisk        = await getLatest(v.risk_assessment_reports)
-    const latestAssessment  = await getLatest(v.assessments)
-    const latestDefence     = await getLatest(v.defences)
-    const latestGadgets     = await getLatest(v.gadgets_reports)
-    const latestAiModelInfo = await getLatest(v.aimodelinfo_reports)
-    const latestEuAiAct     = await getLatest(v.euaiact_reports)
-    const latestDatasets    = await getLatest(v.datasets_reports)
-
-    // Check at least one report exists
-    if (!latestRisk || !latestAssessment || !latestDefence &&
-        !latestGadgets || !latestAiModelInfo || !latestEuAiAct || !latestDatasets) {
-      return res.status(404).json({
-        message: 'No reports found for this model version.'
-      })
-    }
 
     // Build file info helper
     const buildFileInfo = (doc) => {
@@ -313,6 +297,16 @@ const generateAIMBOM = async (req, res) => {
       }
     }
 
+    // Get latest file for each report type from model versioning arrays
+    const latestRisk        = await getLatest(v.risk_assessment_reports)
+    const latestAssessment  = await getLatest(v.assessments)
+    const latestDefence     = await getLatest(v.defences)
+    const latestGadgets     = await getLatest(v.gadgets_reports)
+    const latestAiModelInfo = await getLatest(v.aimodelinfo_reports)
+    const latestEuAiAct     = await getLatest(v.euaiact_reports)
+    const latestDatasets    = await getLatest(v.datasets_reports)
+    const latestAimbom    = await getLatest(v.ai_mbom)  // when we call again STRAE
+
     const reports = {
       risk_report:        buildFileInfo(latestRisk),
       assessment_report:  buildFileInfo(latestAssessment),
@@ -321,7 +315,19 @@ const generateAIMBOM = async (req, res) => {
       aimodelinfo_report: buildFileInfo(latestAiModelInfo),
       euaiact_report:     buildFileInfo(latestEuAiAct),
       datasets_report:    buildFileInfo(latestDatasets),
+      aimbom_report:      buildFileInfo(latestAimbom)
     }
+    
+
+
+    // Check at least one report exists
+    if (!latestRisk || !latestAssessment || !latestDefence &&
+        !latestGadgets || !latestAiModelInfo || !latestEuAiAct || !latestDatasets) {
+      return res.status(404).json({
+        message: 'No reports found for this model version.'
+      })
+    } else if (!latestAimbom){
+    
 
     // Publish to Kafka topic: strae
     await publishEvent('strae', {
@@ -341,11 +347,54 @@ const generateAIMBOM = async (req, res) => {
       model_uuid: uuid,
       version,
       reports,
+    }) 
+    } else {
+    
+    // Pseudocode — you fill in the real logic
+    const lastAimbomTime = latestAimbom.createdAt
+    console.log(lastAimbomTime)
+
+    const changedReports = {}
+
+
+    
+    for (const [key, file] of Object.entries(reports)) {
+
+      if (file && file.createdAt >= lastAimbomTime) {
+        changedReports[key] = buildFileInfo(file)
+      }
+    }
+    // Publish to Kafka topic: strae
+    await publishEvent('strae', {
+      event:       'updated-aimbom-requested',
+      model_name:  model.name,
+      model_uuid:  uuid,
+      version,
+      requestedBy: req.user?.username || 'backend',
+      requestedAt: new Date().toISOString(),
+      changedReports,
     })
+
+    console.log(`[Kafka] update AI-MBOM requested for model ${model.name} version ${version}`)
+
+    res.status(200).json({
+      message:    'update AI-MBOM generation requested',
+      model_uuid: uuid,
+      version,
+      changedReports,
+    })
+    }
+
+
+
+
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }
 }
+
+
+
 export {
   registerModel,
   getAllModels,
@@ -357,3 +406,16 @@ export {
   getReportsAll,
   generateAIMBOM
 }
+
+
+
+
+// 0
+// "6a5f54f244211ea5d45be601"
+// 1
+// "6a5f54f244211ea5d45be60b"
+// 2
+// "6a5f54f344211ea5d45be615"
+
+// 3
+// 6a33b724740b63cfaca18f21

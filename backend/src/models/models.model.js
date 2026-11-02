@@ -51,8 +51,20 @@ const versioningSchema = new Schema(
         },
       user_assessments: { type: [String], default: [] },   
       user_defences:    { type: [String], default: [] }, 
+      user_euaiact: { type: [String], default: [] }, 
       requirements: { type: [String], default: [] },
       trusted_model: { type: [String], default: [] }, 
+      // ── Pending (unsigned originals, waiting for / signed by STRAE) ──
+      risk_assessment_reports_pending: { type: [String], default: [] },
+      assessments_pending:             { type: [String], default: [] },
+      defences_pending:                { type: [String], default: [] },
+      gadgets_reports_pending:         { type: [String], default: [] },
+      aimodelinfo_reports_pending:     { type: [String], default: [] },
+      euaiact_reports_pending:         { type: [String], default: [] },
+      datasets_reports_pending:        { type: [String], default: [] },
+      user_assessments_pending:        { type: [String], default: [] },
+      user_defences_pending:           { type: [String], default: [] },
+      user_euaiact_pending:            { type: [String], default: [] },
     },
     {
         timestamps: true

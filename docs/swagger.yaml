@@ -18,7 +18,9 @@ info:
     | SAP   | Security Assurance Pool |
     | AP    | Assessment Pool |
     | STRDP | Security Trust Robustness Defence |
-  version: 1.0.0
+
+
+  version: 1.1.0
   contact:
     name: CoEvolution Project EU
 
@@ -116,6 +118,62 @@ components:
           items:
             type: string
           default: []
+        user_euaiact:
+          type: array
+          items:
+            type: string
+          default: []
+        risk_assessment_reports_pending:
+          type: array
+          items:
+            type: string
+          default: []
+          description: Unsigned originals (pending buckets)
+        assessments_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        defences_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        gadgets_reports_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        aimodelinfo_reports_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        euaiact_reports_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        datasets_reports_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        user_assessments_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        user_defences_pending:
+          type: array
+          items:
+            type: string
+          default: []
+        user_euaiact_pending:
+          type: array
+          items:
+            type: string
+          default: []
 
     Model:
       type: object
@@ -193,6 +251,10 @@ components:
           items:
             type: string
           example: [risk, Q1]
+        originalFileId:
+          type: string
+          example: 6ae735e37ceea4671026265d
+          description: Only on STRAE's signed copy — _id of the unsigned original
         createdAt:
           type: string
           format: date-time
@@ -214,7 +276,7 @@ components:
           example: A tool for assessing AI model security
         tool_type:
           type: string
-          enum: [assessment, assessment_with_defence, defence, data_generator]
+          enum: [assessment, assessment_with_defence, defence, data_generator, gadgets]
           example: assessment
         github_url:
           type: string
@@ -256,8 +318,6 @@ components:
 tags:
   - name: Models
     description: Model registration and versioning
-  - name: Security
-    description: Security data updated by the orchestrator
   - name: Files
     description: General file operations across all MinIO pools
   - name: Tools-Defences
@@ -318,7 +378,7 @@ paths:
             required: true
             schema:
               type: string
-              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence]
+              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence, user-euaiact, risk-pending, assessment-pending, defence-pending, gadgets-pending, aimodelinfo-pending, euaiact-pending, datasets-pending, user-assessment-pending, user-defence-pending, user-euaiact-pending]
             example: aimbom
             description: Report type — required
           - name: owner
@@ -543,6 +603,8 @@ paths:
           - aimbom          → ai_mbom[]
           - user-assessment → user_assessments[]
           - user-defence    → user_defences[]
+          - user-euaiact    → user_euaiact[]
+          - <type>-pending  → <array>_pending[] (unsigned originals)
         parameters:
           - name: uuid
             in: path
@@ -561,7 +623,7 @@ paths:
             required: true
             schema:
               type: string
-              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence]
+              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence, user-euaiact, risk-pending, assessment-pending, defence-pending, gadgets-pending, aimodelinfo-pending, euaiact-pending, datasets-pending, user-assessment-pending, user-defence-pending, user-euaiact-pending]
         responses:
           '200':
             description: List of report files
@@ -594,14 +656,61 @@ paths:
           '404':
             description: Model or version not found
 
+  /models/{uuid}/versions/{version}/latest:
+      get:
+        tags: [Models]
+        summary: Get latest signed reports + latest AI-MBOM
+        description: |
+          Returns the latest signed file of each report type and the latest AI-MBOM (null if none).
+          `missing` lists the report types that do not exist yet.
+        parameters:
+          - name: uuid
+            in: path
+            required: true
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          - name: version
+            in: path
+            required: true
+            schema:
+              type: string
+            example: v1.0
+        responses:
+          '200':
+            description: Latest reports
+            content:
+              application/json:
+                example:
+                  model_name: MySecurityModel
+                  model_uuid: 550e8400-e29b-41d4-a716-446655440000
+                  version: v1.0
+                  trusted: false
+                  reports:
+                    risk_report:
+                      _id: 6ae75cd852aa8e2a2d63c1a2
+                      bucket: risk-reports
+                      filename: risk-report.json
+                      download_url: https://aegis.coevolution-project.eu/api/v1/files/download/6ae75cd852aa8e2a2d63c1a2
+                      createdAt: '2026-11-01T15:38:00.113Z'
+                    assessment_report: null
+                    defence_report: null
+                    gadgets_report: null
+                    aimodelinfo_report: null
+                    euaiact_report: null
+                    datasets_report: null
+                    aimbom_report: null
+                  missing: [assessment_report, defence_report, gadgets_report, aimodelinfo_report, euaiact_report, datasets_report]
+          '404':
+            description: Model or version not found
+
   /models/{uuid}/versions/{version}/aimbom:
       post:
         tags: [Models]
         summary: Generate AI-MBOM
         description: |
-          Fetches the latest risk, assessment and defence reports for this model version
-          and publishes a Kafka event to the `strae` topic to trigger AI-MBOM generation.
-          At least one report must exist.
+          Fetches the latest signed reports for this model version and publishes a Kafka event
+          to the `strae` topic (`aimbom-requested`, or `updated-aimbom-requested` if an AI-MBOM already exists).
         security:
           - bearerAuth: []
         parameters:
@@ -625,9 +734,6 @@ paths:
           '401':
             description: No token provided
 
-  # ── Security data ────────────────────────────────────────────
-
-
   # ── Files ────────────────────────────────────────────────────
   /files/upload:
       post:
@@ -635,18 +741,15 @@ paths:
         summary: Upload one or more files to any pool and bucket
         description: |
           Accepts 1 or more files. Saves each to MinIO and MongoDB.
-          model_uuid and version are required for all buckets EXCEPT trusted-data.
+          model_uuid and version are required for all buckets EXCEPT data buckets.
+          Reports go to `<bucket>-pending`; only STRAE (role `report-signer`) may upload to the final bucket,
+          with `original_file_id` and exactly one file.
           Publishes ONE Kafka event based on bucket:
-          - `model-requirements`   → `ragre_models`
-          - `trusted-data`     → `data-uploaded` (no model needed)
-          - `user-assessments` → `assessment_reports`
-          - `user-defences`    → `defence_reports`
-          - `risk-reports`     → `risk-report-ready`
-          - `gadgets-reports`  → `gadgets-report-ready`
-          - `aimodelinfo-reports` → `aimodelinfo-report-ready`
-          - `euaiact-reports`  → `euaiact-report-ready`
-          - `datasets-reports` → `datasets-report-ready`
-          - `ai-mbom`          → `aimbom-ready`
+          - `model-requirements` → `ragre_models`
+          - `*-pending`          → `strae_sign_requests`
+          - `user-assessments`   → `assessment_reports`
+          - `user-defences`      → `defence_reports`
+          - `user-euaiact`       → `euaiact_reports`
         security:
           - bearerAuth: []
         requestBody:
@@ -658,35 +761,46 @@ paths:
                 required: [files, pool, bucket]
                 properties:
                   files:
-                    type: string
-                    format: binary
-                    description: One or more files — use field name "files" for each
+                    type: array
+                    items:
+                      type: string
+                      format: binary
+                    description: One or more files
                   pool:
                     type: string
                     enum: [SAP, RP, TRP, AP, STRDP]
                     example: TRP
                   bucket:
                     type: string
-                    example: model-requirements
+                    example: risk-reports-pending
                     description: |
                       TRP pool (model required):
-                        model-requirements
+                        model-requirements, trusted-models
                       TRP pool (no model needed):
-                        trusted-data
-                      RP pool (model required):
+                        trusted-data, siemens-data, avl-data, avi-data
+                      RP pool — unsigned reports:
+                        risk-reports-pending, assessment-reports-pending, defence-reports-pending,
+                        gadgets-reports-pending, aimodelinfo-reports-pending, euaiact-reports-pending,
+                        datasets-reports-pending, user-assessments-pending, user-defences-pending,
+                        user-euaiact-pending
+                      RP pool — signed reports (STRAE only):
                         risk-reports, assessment-reports, defence-reports,
                         gadgets-reports, aimodelinfo-reports, euaiact-reports,
-                        datasets-reports, user-assessments, user-defences
+                        datasets-reports, user-assessments, user-defences, user-euaiact
                       SAP pool (model required):
                         ai-mbom
                   model_uuid:
                     type: string
                     example: 550e8400-e29b-41d4-a716-446655440000
-                    description: Required for all buckets except trusted-data
+                    description: Required for all buckets except data buckets
                   version:
                     type: string
                     example: v1.0
-                    description: Required for all buckets except trusted-data
+                    description: Required for all buckets except data buckets
+                  original_file_id:
+                    type: string
+                    example: 6ae735e37ceea4671026265d
+                    description: STRAE only — _id of the unsigned original (from strae_sign_requests)
                   tags:
                     type: string
                     description: comma-separated tags
@@ -710,9 +824,13 @@ paths:
                       items:
                         $ref: '#/components/schemas/File'
           '400':
-            description: Missing required fields
+            description: Missing required fields or invalid original_file_id
+          '403':
+            description: Only STRAE can upload to a signed report bucket
           '404':
             description: Bucket does not exist in pool
+          '409':
+            description: Original already signed
 
   /files:
     get:

@@ -1,5 +1,6 @@
 // src/config/minio.js
 import { Client } from 'minio'
+import { SIGNED_REPORTS, toPending } from './signing.js'
 
 function makeClient(host, port, accessKey, secretKey) {
   return new Client({
@@ -51,7 +52,8 @@ export function getPool(poolName) {
 export async function initMinIO() {
   const buckets = {
     SAP:   ['ai-mbom'],
-    RP:    ['risk-reports','assessment-reports','defence-reports','user-assessment-reports','user-defence-reports','gadgets-reports','aimodelinfo-reports','euaiact-reports','datasets-reports'],
+    RP:    ['risk-reports','assessment-reports','defence-reports','user-assessments','user-defences','user-euaiact','gadgets-reports','aimodelinfo-reports','euaiact-reports','datasets-reports',
+      'risk-reports-pending','assessment-reports-pending','defence-reports-pending','user-assessments-pending','user-defences-pending','user-euaiact-pending','gadgets-reports-pending','aimodelinfo-reports-pending','euaiact-reports-pending','datasets-reports-pending'],
     TRP:   ['trusted-data', 'model-requirements'],
     AP:    ['assessment-libraries','assessment-tools'],
     STRDP: ['defence-libraries','design-train-defence-tools','deployment-test-defence-tools'],

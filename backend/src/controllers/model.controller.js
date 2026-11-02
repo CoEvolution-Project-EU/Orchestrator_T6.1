@@ -3,6 +3,77 @@ import { Model } from '../models/models.model.js'
 import { File } from '../models/file.model.js'
 import { publishEvent } from '../config/kafka.js'
 
+
+// ── Report type → versioning array (shared by getReports + getReportsAll) ─
+const REPORT_FIELDS = {
+  'requirements':            'requirements',
+  'trusted-model':           'trusted_model',
+  'risk':                    'risk_assessment_reports',
+  'assessment':              'assessments',
+  'defence':                 'defences',
+  'gadgets':                 'gadgets_reports',
+  'aimodelinfo':             'aimodelinfo_reports',
+  'euaiact':                 'euaiact_reports',
+  'datasets':                'datasets_reports',
+  'aimbom':                  'ai_mbom',
+  'user-assessment':         'user_assessments',
+  'user-defence':            'user_defences',
+  'user-euaiact':            'user_euaiact',                     // NEW
+
+  // pending: unsigned originals (history)
+  'risk-pending':            'risk_assessment_reports_pending',
+  'assessment-pending':      'assessments_pending',
+  'defence-pending':         'defences_pending',
+  'gadgets-pending':         'gadgets_reports_pending',
+  'aimodelinfo-pending':     'aimodelinfo_reports_pending',
+  'euaiact-pending':         'euaiact_reports_pending',
+  'datasets-pending':        'datasets_reports_pending',
+  'user-assessment-pending': 'user_assessments_pending',
+  'user-defence-pending':    'user_defences_pending',
+  'user-euaiact-pending':    'user_euaiact_pending',
+}
+
+// ── Latest-report set: response key → final (signed) versioning array ─
+const LATEST_REPORTS = {
+  risk_report:        'risk_assessment_reports',
+  assessment_report:  'assessments',
+  defence_report:     'defences',
+  gadgets_report:     'gadgets_reports',
+  aimodelinfo_report: 'aimodelinfo_reports',
+  euaiact_report:     'euaiact_reports',
+  datasets_report:    'datasets_reports',
+  aimbom_report:      'ai_mbom',
+}
+
+// Latest file (by createdAt) from a versioning array, or null
+const getLatest = async (fileIds) => {
+  if (!fileIds || fileIds.length === 0) return null
+  const files = await File.find({ _id: { $in: fileIds } }).sort({ createdAt: -1 }).limit(1)
+  return files[0] || null
+}
+
+// Only the fields a caller needs
+const buildFileInfo = (doc) => {
+  if (!doc) return null
+  return {
+    _id:          doc._id,
+    bucket:       doc.bucket,
+    filename:     doc.filename,
+    download_url: `https://aegis.coevolution-project.eu/api/v1/files/download/${doc._id}`,
+    createdAt:    doc.createdAt,
+  }
+}
+
+// Latest signed file of every type for one model version
+const getLatestReports = async (v) => {
+  const reports = {}
+  for (const [key, field] of Object.entries(LATEST_REPORTS)) {
+    reports[key] = buildFileInfo(await getLatest(v[field]))
+  }
+  return reports
+}
+
+
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
   try {
@@ -106,29 +177,29 @@ const updateRequirementsUrl = async (req, res) => {
   }
 }
 
-// ── Update security data (orchestrator) ──────────────────────
-const updateSecurityData = async (req, res) => {
-  try {
-    const {  defences, assessments, risk_assessment_reports, trusted } = req.body
-    const { uuid, version } = req.params
+// // ── Update security data (orchestrator) ──────────────────────
+// const updateSecurityData = async (req, res) => {
+//   try {
+//     const {  defences, assessments, risk_assessment_reports, trusted } = req.body
+//     const { uuid, version } = req.params
 
-    const model = await Model.findOne({ model_uuid: uuid })
-    if (!model) return res.status(404).json({ message: 'Model not found' })
+//     const model = await Model.findOne({ model_uuid: uuid })
+//     if (!model) return res.status(404).json({ message: 'Model not found' })
 
-    const v = model.versioning.find(v => v.version === version)
-    if (!v) return res.status(404).json({ message: 'Version not found' })
+//     const v = model.versioning.find(v => v.version === version)
+//     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    if (defences)                 v.defences                = defences
-    if (assessments)              v.assessments             = assessments
-    if (risk_assessment_reports)  v.risk_assessment_reports = risk_assessment_reports
-    if (trusted !== undefined)    v.trusted                 = trusted
+//     if (defences)                 v.defences                = defences
+//     if (assessments)              v.assessments             = assessments
+//     if (risk_assessment_reports)  v.risk_assessment_reports = risk_assessment_reports
+//     if (trusted !== undefined)    v.trusted                 = trusted
 
-    await model.save()
-    res.status(200).json({ message: 'Security data updated', model })
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error })
-  }
-}
+//     await model.save()
+//     res.status(200).json({ message: 'Security data updated', model })
+//   } catch (error) {
+//     res.status(500).json({ message: 'Server error', error })
+//   }
+// }
 
 
 const getReports = async (req, res) => {
@@ -136,29 +207,18 @@ const getReports = async (req, res) => {
     const { uuid, version } = req.params
     const { type } = req.query
 
-    if (!type) return res.status(400).json({ message: 'type is required (risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence)' })
-
+    if (!type) return res.status(400).json({
+      message: `type is required (${Object.keys(REPORT_FIELDS).join(', ')})`
+    })
     const model = await Model.findOne({ model_uuid: uuid })
     if (!model) return res.status(404).json({ message: 'Model not found' })
 
     const v = model.versioning.find(v => v.version === version)
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    const fieldMap = {
-      'requirements':    'requirements', 
-      'risk':            'risk_assessment_reports',
-      'assessment':      'assessments',
-      'defence':         'defences',
-      'gadgets':         'gadgets_reports',
-      'aimodelinfo':     'aimodelinfo_reports',
-      'euaiact':         'euaiact_reports',
-      'datasets':        'datasets_reports',
-      'aimbom':          'ai_mbom',
-      'user-assessment': 'user_assessments',
-      'user-defence':    'user_defences',
-    }
+    
+    const field = REPORT_FIELDS[type]
 
-    const field = fieldMap[type]
     if (!field) return res.status(400).json({ message: `Unknown type: ${type}.` })
 
     const fileIds = v[field]
@@ -202,22 +262,9 @@ const getReportsAll = async (req, res) => {
 
     if (!type) return res.status(400).json({ message: 'type is required' })
 
-    const fieldMap = {
-      'requirements':    'requirements',
-      'trusted-model':   'trusted_model',
-      'risk':            'risk_assessment_reports',
-      'assessment':      'assessments',
-      'defence':         'defences',
-      'gadgets':         'gadgets_reports',
-      'aimodelinfo':     'aimodelinfo_reports',
-      'euaiact':         'euaiact_reports',
-      'datasets':        'datasets_reports',
-      'aimbom':          'ai_mbom',
-      'user-assessment': 'user_assessments',
-      'user-defence':    'user_defences',
-    }
+    const field = REPORT_FIELDS[type]
 
-    const field = fieldMap[type]
+
     if (!field) return res.status(400).json({ message: `Unknown type: ${type}` })
 
     // Build model query
@@ -277,25 +324,7 @@ const generateAIMBOM = async (req, res) => {
     const v = model.versioning.find(v => v.version === version)
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    // Helper — get latest file from a versioning array
-    const getLatest = async (fileIds) => {
-      if (!fileIds || fileIds.length === 0) return null
-      const files = await File.find({ _id: { $in: fileIds } }).sort({ createdAt: -1 })
-      return files[0] || null
-    }
 
-
-    // Build file info helper
-    const buildFileInfo = (doc) => {
-      if (!doc) return null
-      return {
-        _id:          doc._id,
-        bucket:       doc.bucket,
-        filename:     doc.filename,
-        download_url: `https://aegis.coevolution-project.eu/api/v1/files/download/${doc._id}`,
-        createdAt:    doc.createdAt,
-      }
-    }
 
     // Get latest file for each report type from model versioning arrays
     const latestRisk        = await getLatest(v.risk_assessment_reports)
@@ -392,6 +421,36 @@ const generateAIMBOM = async (req, res) => {
   }
 }
 
+// GET /api/v1/models/:uuid/versions/:version/latest
+// Latest SIGNED report of each type + latest AIMBOM
+const getLatestReportsForVersion = async (req, res) => {
+  try {
+    const { uuid, version } = req.params
+
+    const model = await Model.findOne({ model_uuid: uuid })
+    if (!model) return res.status(404).json({ message: 'Model not found' })
+
+    const v = model.versioning.find(v => v.version === version)
+    if (!v) return res.status(404).json({ message: 'Version not found' })
+
+    const reports = await getLatestReports(v)
+
+    // which evidence reports are still missing (AIMBOM itself is not "evidence")
+    const missing = Object.keys(reports)
+      .filter(key => key !== 'aimbom_report' && !reports[key])
+
+    res.status(200).json({
+      model_name: model.name,
+      model_uuid: uuid,
+      version,
+      trusted:    v.trusted,
+      reports,
+      missing,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
 
 
 export {
@@ -400,10 +459,11 @@ export {
   getModelByUUID,
   addVersion,
   updateRequirementsUrl,
-  updateSecurityData,
+  // updateSecurityData,
   getReports,
   getReportsAll,
-  generateAIMBOM
+  generateAIMBOM,
+  getLatestReportsForVersion
 }
 
 

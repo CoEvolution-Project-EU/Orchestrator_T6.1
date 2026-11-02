@@ -8,10 +8,11 @@ import {
   getModelByUUID,
   addVersion,
   updateRequirementsUrl,
-  updateSecurityData,
+  // updateSecurityData,
   getReports,
   getReportsAll,
-  generateAIMBOM
+  generateAIMBOM,
+  getLatestReportsForVersion
 } from '../controllers/model.controller.js'
 
 const router = Router()
@@ -22,14 +23,14 @@ router.get('/',      getAllModels)
 router.get('/reports', getReportsAll)
 router.get('/:uuid', getModelByUUID)
 router.get('/:uuid/versions/:version/reports', getReports)
-
+router.get('/:uuid/versions/:version/latest', getLatestReportsForVersion)
 
 
 // Protected — require Keycloak token
 router.post('/register',                                      requireAuth, registerModel)
 router.post('/:uuid/versions',                                requireAuth, addVersion)
 router.patch('/:uuid/versions/:version/requirements-url',     requireAuth, updateRequirementsUrl)
-router.patch('/:uuid/versions/:version/security',             requireAuth, updateSecurityData)
+// router.patch('/:uuid/versions/:version/security',             requireAuth, updateSecurityData)
 router.post('/:uuid/versions/:version/aimbom',                requireAuth, generateAIMBOM)  
 
 export default router

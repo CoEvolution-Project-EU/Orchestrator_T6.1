@@ -5,25 +5,75 @@ import { getPool } from '../config/minio.js'
 import { File } from '../models/file.model.js'
 import { Model } from '../models/models.model.js' 
 import { publishEvent } from '../config/kafka.js'
+import mongoose from 'mongoose'
 import path from 'path'
 import fs from 'fs'
 
+// ── STRAE signing settings ────────────────────────────────────
+const SIGNER_ROLE    = 'report-signer'
+const SIGN_TOPIC     = 'strae_sign_requests'
+const PENDING_SUFFIX = '-pending'
 
-    // ── Auto-update model versioning for engine report buckets ─
-    const reportBuckets = {
-      'model-requirements':      'requirements', 
-      'risk-reports':       'risk_assessment_reports',
-      'assessment-reports': 'assessments',
-      'defence-reports':    'defences',
-      'gadgets-reports':     'gadgets_reports',       
-      'aimodelinfo-reports': 'aimodelinfo_reports',  
-      'euaiact-reports':     'euaiact_reports',       
-      'datasets-reports':    'datasets_reports',
-      'ai-mbom':             'ai_mbom', 
-      'user-assessments':    'user_assessments',    
-      'user-defences':       'user_defences',       
-      'trusted-models': 'trusted_model',
-    }
+// Final buckets that ONLY STRAE may write to (must match initMinIO RP list)
+const SIGNED_REPORTS = [
+  'user-assessments',
+  'user-defences',
+  'user-euaiact',
+  'aimodelinfo-reports',
+  'datasets-reports',
+  'gadgets-reports',
+  'risk-reports',
+  'assessment-reports',
+  'defence-reports',
+  'euaiact-reports',
+]
+
+const toPending      = (bucket) => `${bucket}${PENDING_SUFFIX}`
+const fromPending    = (bucket) => bucket.slice(0, -PENDING_SUFFIX.length)
+const isSignedReport = (bucket) => SIGNED_REPORTS.includes(bucket)
+
+// ── Auto-update model versioning for engine report buckets ─
+const reportBuckets = {
+  'model-requirements':  'requirements',
+  'risk-reports':        'risk_assessment_reports',
+  'assessment-reports':  'assessments',
+  'defence-reports':     'defences',
+  'gadgets-reports':     'gadgets_reports',
+  'aimodelinfo-reports': 'aimodelinfo_reports',
+  'euaiact-reports':     'euaiact_reports',
+  'datasets-reports':    'datasets_reports',
+  'ai-mbom':             'ai_mbom',
+  'user-assessments':    'user_assessments',
+  'user-defences':       'user_defences',
+  'user-euaiact':        'user_euaiact',        
+  'trusted-models':      'trusted_model',
+}
+
+// ── Bucket → Kafka topic ──────────────────────────────────────
+const topicMap = {
+  'model-requirements': 'ragre_models',
+  'user-assessments':   'assessment_reports',
+  'user-defences':      'defence_reports',
+  'user-euaiact':       'euaiact_reports',
+}
+
+// ── Topic → where the receiving engine must upload its result ─
+const resultBuckets = {
+  'ragre_models':       'risk-reports-pending',
+  'assessment_reports': 'assessment-reports-pending',
+  'defence_reports':    'defence-reports-pending',
+  'euaiact_reports':    'euaiact-reports-pending',
+}
+
+// ── Add every pending bucket to both tables ───────────────────
+// e.g. risk-reports-pending → risk_assessment_reports_pending + strae_sign_requests
+for (const bucket of SIGNED_REPORTS) {
+  if (!reportBuckets[bucket]) {
+    throw new Error(`[signing] No versioning field defined for signed bucket "${bucket}"`)
+  }
+  reportBuckets[toPending(bucket)] = `${reportBuckets[bucket]}_pending`
+  topicMap[toPending(bucket)]      = SIGN_TOPIC
+}
 
     const getSafeName = async (filename, bucket, model_uuid, version) => {
       const ext  = path.extname(filename)
@@ -62,13 +112,13 @@ import fs from 'fs'
     
 const uploadFile = async (req, res) => {
   try {
-    const { pool, bucket, model_uuid, version, tags } = req.body
+    const { pool, bucket, model_uuid, version, tags , original_file_id } = req.body
     const files = req.files
 
     if (!files || files.length === 0)
       return res.status(400).json({ message: 'At least one file is required' })
     if (!pool || !bucket )
-      return res.status(400).json({ message: 'pool, bucket ' })
+      return res.status(400).json({ message: 'pool, bucket are required' })
 
     // check data bucket FIRST
     const dataBuckets = ['trusted-data','siemens-data', 'avl-data', 'avi-data']
@@ -79,6 +129,53 @@ const uploadFile = async (req, res) => {
         message: `model_uuid and version are required for bucket "${bucket}"`
       })
     }
+
+    // ── Signing guard ─────────────────────────────────────────
+    // Final report buckets accept ONLY STRAE's signed copy of a pending original
+    const isSigner = req.user?.roles?.includes(SIGNER_ROLE) || false
+    let originalFileId
+
+    if (isSignedReport(bucket)) {
+
+      // 1. Only STRAE may write here
+      if (!isSigner) {
+        return res.status(403).json({
+          message: `Unsigned reports must be uploaded to "${toPending(bucket)}". Only STRAE can write to "${bucket}".`
+        })
+      }
+
+      // 2. A signed copy must say which original it signs
+      if (!original_file_id || !mongoose.isValidObjectId(original_file_id)) {
+        return res.status(400).json({ message: 'A valid original_file_id is required for signed uploads' })
+      }
+
+      // 3. One signed copy ↔ one original
+      if (files.length !== 1) {
+        return res.status(400).json({ message: 'Signed uploads must contain exactly one file' })
+      }
+
+      // 4. The original must be a pending report of THIS model version
+      const model        = await Model.findOne({ model_uuid })
+      const v            = model?.versioning.find(v => v.version === version)
+      const pendingField = reportBuckets[toPending(bucket)]
+
+      if (!v || !v[pendingField]?.includes(original_file_id)) {
+        return res.status(400).json({
+          message: `File ${original_file_id} is not a pending "${toPending(bucket)}" report of model ${model_uuid} version ${version}`
+        })
+      }
+
+      // 5. An original can be signed only once
+      if (await File.exists({ originalFileId: original_file_id })) {
+        return res.status(409).json({ message: `File ${original_file_id} has already been signed` })
+      }
+
+      originalFileId = original_file_id
+    }
+    // ─────────────────────────────────────────────────────────
+
+
+
     const client = getPool(pool)
     if (!client) return res.status(400).json({ message: `Unknown pool: ${pool}` })
 
@@ -115,6 +212,7 @@ const uploadFile = async (req, res) => {
         contentType: file.mimetype,
         uploadedBy:  req.user?.username || 'backend',
         tags:        tags ? tags.split(',').map(t => t.trim()) : [],
+        originalFileId,                       // only set for STRAE's signed copy
       })
 
       uploadedDocs.push({
@@ -122,9 +220,6 @@ const uploadFile = async (req, res) => {
         download_url: `https://aegis.coevolution-project.eu/api/v1/files/download/${doc._id}`
       })
     }
-
-
-
 
 
     const fieldToUpdate = reportBuckets[bucket]
@@ -153,11 +248,6 @@ const uploadFile = async (req, res) => {
     }
 
     // ── Kafka topic map ───────────────────────────────────────
-    const topicMap = {
-      'model-requirements':   'ragre_models',
-      'user-assessments': 'assessment_reports',
-      'user-defences':    'defence_reports'
-      }
 
     const topic = topicMap[bucket]
 
@@ -174,6 +264,12 @@ const uploadFile = async (req, res) => {
           uploadedBy:  req.user?.username || 'backend',
           uploadedAt:  new Date().toISOString(),
           pool,                               // ← move pool to top level
+          // tell STRAE where the signed copy must go
+          ...(topic === SIGN_TOPIC
+            ? { target_pool: 'RP', target_bucket: fromPending(bucket) }     // STRAE
+            : resultBuckets[topic]
+              ? { target_pool: 'RP', target_bucket: resultBuckets[topic] }  // engine
+              : {}),
           tags:        tags ? tags.split(',').map(t => t.trim()) : [],  // ← move tags to top level
           total_files: uploadedDocs.length,
           files:       uploadedDocs.map(doc => ({   // ← only keep needed fields
@@ -196,7 +292,7 @@ const uploadFile = async (req, res) => {
     })
   } catch (error) {
     res.status(500).json({ message: 'Upload failed', error: error.message })
-  }
+  } 
 }
 
 

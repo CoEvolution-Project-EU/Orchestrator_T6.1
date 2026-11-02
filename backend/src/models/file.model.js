@@ -14,6 +14,8 @@ const fileSchema = new Schema(
     contentType: { type: String },
     uploadedBy:  { type: String, index: true },
     tags:        { type: [String], default: [] },
+    // Set ONLY on STRAE's signed copy → points to the unsigned original in <bucket>-pending
+    originalFileId: { type: Schema.Types.ObjectId, ref: 'File' },
   },
   { timestamps: true }
 )

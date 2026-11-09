@@ -2,7 +2,6 @@
 // app.js = "the thing that handles requests"
 // index.js = "the thing that starts everything"
 import express from "express"; //Bring Express into my project
-import userRouter from './routes/user.routes.js'; // routes import
 import modelsRouter from  './routes/models.routes.js';
 import filesRouter from './routes/files.routes.js' //minio
 import toolsRouter from './routes/tools.routes.js' //minio
@@ -32,9 +31,7 @@ const swaggerDoc = yaml.load(
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc))
 
 
-// ── Routes ───────────────────────────────────────────────────
-// routes declaration , If request starts with /api/v1/users → send it to userRouter
-app.use("/api/v1/users", userRouter);
+
 app.use("/api/v1/models", modelsRouter);
 
 

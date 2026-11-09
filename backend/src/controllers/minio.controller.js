@@ -4,6 +4,7 @@
 import { getPool } from '../config/minio.js'
 import { File } from '../models/file.model.js'
 import { Model } from '../models/models.model.js' 
+import { Aimbom } from '../models/aimbom.model.js'
 import { publishEvent } from '../config/kafka.js'
 import mongoose from 'mongoose'
 import path from 'path'
@@ -75,39 +76,39 @@ for (const bucket of SIGNED_REPORTS) {
   topicMap[toPending(bucket)]      = SIGN_TOPIC
 }
 
-    const getSafeName = async (filename, bucket, model_uuid, version) => {
-      const ext  = path.extname(filename)
-      const base = path.basename(filename, ext)
-    
-      // 1. Find the model
-      const model = await Model.findOne({ model_uuid })
-      if (!model) return filename
-    
-      // 2. Find the version
-      const v = model.versioning.find(v => v.version === version)
-      if (!v) return filename
-    
-      // 3. Get the correct array field for this bucket
-      const field = reportBuckets[bucket]
-      if (!field) return filename
-    
-      // 4. Get all file IDs already stored in this version's array
-      const fileIds = v[field]
-      if (!fileIds || fileIds.length === 0) return filename
-    
-      // 5. Fetch those files from MongoDB
-      const existingFiles = await File.find({ _id: { $in: fileIds } })
-    
-      // 6. Check if any have the same base name
-      const matches = existingFiles.filter(f =>
-        f.filename === filename
-      )
-      if (matches.length === 0) return filename
-    
-      // 7. Generate next suffix
-      const pad = String(matches.length).padStart(2, '0')
-      return `${base}_${pad}${ext}`
-    }
+const getSafeName = async (filename, bucket, model_uuid, version) => {
+  const ext  = path.extname(filename)
+  const base = path.basename(filename, ext)
+
+  // 1. Find the model
+  const model = await Model.findOne({ model_uuid })
+  if (!model) return filename
+
+  // 2. Find the version
+  const v = model.versioning.find(v => v.version === version)
+  if (!v) return filename
+
+  // 3. Get the correct array field for this bucket
+  const field = reportBuckets[bucket]
+  if (!field) return filename
+
+  // 4. Get all file IDs already stored in this version's array
+  const fileIds = v[field]
+  if (!fileIds || fileIds.length === 0) return filename
+
+  // 5. Fetch those files from MongoDB
+  const existingFiles = await File.find({ _id: { $in: fileIds } })
+
+  // 6. Check if any have the same base name
+  const matches = existingFiles.filter(f =>
+    f.filename === filename
+  )
+  if (matches.length === 0) return filename
+
+  // 7. Generate next suffix
+  const pad = String(matches.length).padStart(2, '0')
+  return `${base}_${pad}${ext}`
+}
 
     
 const uploadFile = async (req, res) => {
@@ -174,7 +175,28 @@ const uploadFile = async (req, res) => {
     }
     // ─────────────────────────────────────────────────────────
 
+    // ── AIMBOM guard: only STRAE, and only for a pending AIMBOM ──
+    let pendingAimbom = null
 
+    if (bucket === 'ai-mbom') {
+      // 1. Only STRAE may upload AIMBOMs
+      if (!isSigner) {
+        return res.status(403).json({ message: 'Only STRAE can upload AI-MBOMs' })
+      }
+
+      // 2. One AIMBOM file per request
+      if (files.length !== 1) {
+        return res.status(400).json({ message: 'Upload exactly one AI-MBOM file' })
+      }
+
+      // 3. There must be a pending AIMBOM for this model version
+      pendingAimbom = await Aimbom.findOne({ model_uuid, version, status: 'pending' })
+      if (!pendingAimbom) {
+        return res.status(409).json({
+          message: `No pending AI-MBOM request for model ${model_uuid} version ${version}`
+        })
+      }
+    }
 
     const client = getPool(pool)
     if (!client) return res.status(400).json({ message: `Unknown pool: ${pool}` })
@@ -246,6 +268,27 @@ const uploadFile = async (req, res) => {
         }
       }
     }
+
+    // ── AIMBOM lifecycle: pending → completed, previous completed → deprecated ──
+    if (pendingAimbom) {
+      // 1. The new AIMBOM is now the valid one
+      pendingAimbom.status         = 'completed'
+      pendingAimbom.aimbom_file_id = uploadedDocs[0]._id.toString()
+      pendingAimbom.completedAt    = new Date()
+      await pendingAimbom.save()
+
+      // 2. Every OTHER completed AIMBOM of this version is now deprecated
+      await Aimbom.updateMany(
+        {
+          model_uuid,
+          version,
+          status:    'completed',
+          aimbom_id: { $ne: pendingAimbom.aimbom_id },   // $ne = "not equal" → skip the new one
+        },
+        { $set: { status: 'deprecated' } }
+      )
+    }
+
 
     // ── Kafka topic map ───────────────────────────────────────
 

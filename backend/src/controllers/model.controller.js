@@ -1,6 +1,7 @@
 // src/controllers/model.controller.js
 import { Model } from '../models/models.model.js'
 import { File } from '../models/file.model.js'
+import { Aimbom } from '../models/aimbom.model.js'
 import { publishEvent } from '../config/kafka.js'
 
 
@@ -73,6 +74,17 @@ const getLatestReports = async (v) => {
   return reports
 }
 
+
+// Create a pending AIMBOM record.
+// Returns null if this model version already has a pending one.
+const createPendingAimbom = async (data) => {
+  try {
+    return await Aimbom.create(data)
+  } catch (error) {
+    if (error.code === 11000) return null   // duplicate key → the partial unique index said "already pending"
+    throw error                             // any other error → let the controller's catch handle it
+  }
+}
 
 // ── Register a model ──────────────────────────────────────────
 const registerModel = async (req, res) => {
@@ -325,7 +337,6 @@ const generateAIMBOM = async (req, res) => {
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
 
-
     // Get latest file for each report type from model versioning arrays
     const latestRisk        = await getLatest(v.risk_assessment_reports)
     const latestAssessment  = await getLatest(v.assessments)
@@ -347,79 +358,143 @@ const generateAIMBOM = async (req, res) => {
       aimbom_report:      buildFileInfo(latestAimbom)
     }
     
+    // ── STEP 1: all 7 reports are required ───────────────────
+    const required = {
+      risk_report:        latestRisk,
+      assessment_report:  latestAssessment,
+      defence_report:     latestDefence,
+      gadgets_report:     latestGadgets,
+      aimodelinfo_report: latestAiModelInfo,
+      euaiact_report:     latestEuAiAct,
+      datasets_report:    latestDatasets,
+    }
+
+    // keep only the names whose value is null → the missing ones
+    const missing = Object.keys(required).filter(key => !required[key])
 
 
     // Check at least one report exists
-    if (!latestRisk || !latestAssessment || !latestDefence &&
-        !latestGadgets || !latestAiModelInfo || !latestEuAiAct || !latestDatasets) {
-      return res.status(404).json({
-        message: 'No reports found for this model version.'
+    if (missing.length > 0) {
+        return res.status(404).json({
+        message: 'Cannot generate AI-MBOM: required reports are missing',
+        missing,  // e.g. ["defence_report", "gadgets_report"]
       })
-    } else if (!latestAimbom){
-    
+    }
 
-    // Publish to Kafka topic: strae
-    await publishEvent('strae', {
-      event:       'aimbom-requested',
-      model_name:  model.name,
-      model_uuid:  uuid,
-      version,
-      requestedBy: req.user?.username || 'backend',
-      requestedAt: new Date().toISOString(),
-      reports,
-    })
+    // The 7 report IDs this AIMBOM will be built from
+    const sources = {}
+    for (const [key, doc] of Object.entries(required)) {
+      sources[key] = doc._id.toString()
+    }
 
-    console.log(`[Kafka] AI-MBOM requested for model ${model.name} version ${version}`)
 
-    res.status(200).json({
-      message:    'AI-MBOM generation requested',
-      model_uuid: uuid,
-      version,
-      reports,
-    }) 
-    } else {
-    
-    // Pseudocode — you fill in the real logic
+    // ── First time → full generation ─────────────────────────
+    if (!latestAimbom) {
+      const aimbom = await createPendingAimbom({
+        model_uuid:  uuid,
+        version,
+        event:       'aimbom-requested',
+        sources,
+        requestedBy: req.user?.username || 'backend',
+      })
+      if (!aimbom) {
+        return res.status(409).json({ message: 'An AI-MBOM generation is already in progress for this model version' })
+      }
+
+      try {
+        await publishEvent('strae', {
+          event:       'aimbom-requested',
+          model_name:  model.name,
+          model_uuid:  uuid,
+          version,
+          requestedBy: req.user?.username || 'backend',
+          requestedAt: new Date().toISOString(),
+          reports,
+        })
+      } catch (kafkaError) {
+        aimbom.status = 'cancelled'      // STRAE never got the request → don't block future ones
+        await aimbom.save()
+        throw kafkaError
+      }
+
+      console.log(`[Kafka] AI-MBOM requested for model ${model.name} version ${version}`)
+
+      return res.status(200).json({
+        message:    'AI-MBOM generation requested',
+        aimbom_id:  aimbom.aimbom_id,
+        model_uuid: uuid,
+        version,
+        reports,
+      })
+    }
+
+    // ── STEP 2: reports newer than the current AIMBOM ────────
     const lastAimbomTime = latestAimbom.createdAt
-    console.log(lastAimbomTime)
-
     const changedReports = {}
-
-
     
     for (const [key, file] of Object.entries(reports)) {
-
-      if (file && file.createdAt >= lastAimbomTime) {
-        changedReports[key] = buildFileInfo(file)
+      if (key === 'aimbom_report') continue            // never compare the AIMBOM with itself
+      if (file && file.createdAt > lastAimbomTime) {   // strictly newer
+        changedReports[key] = file
       }
     }
-    // Publish to Kafka topic: strae
-    await publishEvent('strae', {
-      event:       'updated-aimbom-requested',
-      model_name:  model.name,
+    // ── STEP 3: nothing new → publish nothing ────────────────
+    if (Object.keys(changedReports).length === 0) {
+      return res.status(200).json({
+        message:       'AI-MBOM is already up to date — no newer reports',
+        up_to_date:    true,
+        model_uuid:    uuid,
+        version,
+        aimbom_report: reports.aimbom_report,
+      })
+    }
+
+    // ── STEP 4: STRAE needs the existing AIMBOM (same message as before) ─
+    const aimbom = await createPendingAimbom({
       model_uuid:  uuid,
       version,
+      event:       'updated-aimbom-requested',
+      sources,                                   // still the FULL set of 7
       requestedBy: req.user?.username || 'backend',
-      requestedAt: new Date().toISOString(),
-      changedReports,
     })
+    if (!aimbom) {
+      return res.status(409).json({ message: 'An AI-MBOM generation is already in progress for this model version' })
+    }
+
+    changedReports.aimbom_report = reports.aimbom_report
+
+    try {
+      await publishEvent('strae', {
+        event:       'updated-aimbom-requested',
+        model_name:  model.name,
+        model_uuid:  uuid,
+        version,
+        requestedBy: req.user?.username || 'backend',
+        requestedAt: new Date().toISOString(),
+        changedReports,
+      })
+    } catch (kafkaError) {
+      aimbom.status = 'cancelled'
+      await aimbom.save()
+      throw kafkaError
+    }
 
     console.log(`[Kafka] update AI-MBOM requested for model ${model.name} version ${version}`)
 
     res.status(200).json({
       message:    'update AI-MBOM generation requested',
+      aimbom_id:  aimbom.aimbom_id,
       model_uuid: uuid,
       version,
       changedReports,
     })
-    }
-
-
-
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
   }
 }
+
+
+
 
 // GET /api/v1/models/:uuid/versions/:version/latest
 // Latest SIGNED report of each type + latest AIMBOM

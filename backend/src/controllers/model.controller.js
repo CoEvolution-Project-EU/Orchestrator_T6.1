@@ -448,6 +448,34 @@ const generateAIMBOM = async (req, res) => {
         aimbom_report: reports.aimbom_report,
       })
     }
+    
+    // ── STEP 3b: only assessment + risk may change for a new AIMBOM version ─
+    // Any other report changing means the MODEL changed → it needs a new model version
+    const UPDATE_TYPES  = ['assessment_report', 'risk_report']
+    const changedTypes  = Object.keys(changedReports)
+    const otherChanges  = changedTypes.filter(type => !UPDATE_TYPES.includes(type))
+
+    if (otherChanges.length > 0) {
+      return res.status(409).json({
+        message: 'These reports changed after the current AI-MBOM, which means the model changed. Register a new model version and generate its AI-MBOM there.',
+        changed: otherChanges,          // e.g. ["defence_report", "gadgets_report"]
+      })
+    }
+
+    // ── STEP 3c: a new AIMBOM version needs a new assessment AND the updated risk report ─
+    if (!changedReports.assessment_report) {
+      return res.status(409).json({
+        message: 'A new AI-MBOM version requires a new assessment report.',
+        changed: changedTypes,
+      })
+    }
+
+    if (!changedReports.risk_report) {
+      return res.status(409).json({
+        message: 'New assessment found, but the updated risk report is not available yet. Wait for RAGRE (and STRAE signing), then try again.',
+        changed: changedTypes,
+      })
+    }
 
     // ── STEP 4: STRAE needs the existing AIMBOM (same message as before) ─
     const aimbom = await createPendingAimbom({
@@ -493,7 +521,41 @@ const generateAIMBOM = async (req, res) => {
   }
 }
 
+// POST /api/v1/models/:uuid/versions/:version/aimbom/cancel
+// Releases a stuck pending AIMBOM (e.g. STRAE failed) so a new one can be requested
+const cancelAIMBOM = async (req, res) => {
+  try {
+    const { uuid, version } = req.params
+    const { reason } = req.body || {}
 
+    // Find the pending AIMBOM AND cancel it in one atomic operation
+    const aimbom = await Aimbom.findOneAndUpdate(
+      { model_uuid: uuid, version, status: 'pending' },     // only if it is still pending
+      {
+        $set: {
+          status:       'cancelled',
+          cancelledAt:  new Date(),
+          cancelledBy:  req.user?.username || 'backend',
+          cancelReason: reason || null,
+        },
+      },
+      { returnDocument: 'after' }                           // return the updated document
+    )
+
+    if (!aimbom) {
+      return res.status(404).json({
+        message: `No pending AI-MBOM for model ${uuid} version ${version}`
+      })
+    }
+
+    res.status(200).json({
+      message: 'Pending AI-MBOM cancelled — a new generation can now be requested',
+      aimbom,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
 
 
 // GET /api/v1/models/:uuid/versions/:version/latest
@@ -538,7 +600,8 @@ export {
   getReports,
   getReportsAll,
   generateAIMBOM,
-  getLatestReportsForVersion
+  getLatestReportsForVersion,
+  cancelAIMBOM
 }
 
 

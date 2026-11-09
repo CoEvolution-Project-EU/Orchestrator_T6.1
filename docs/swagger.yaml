@@ -305,6 +305,44 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    Aimbom:
+      type: object
+      properties:
+        aimbom_id:
+          type: string
+          example: 3f2b8c1e-7d4a-4c2e-9b1f-1a2b3c4d5e6f
+        model_uuid:
+          type: string
+          example: 550e8400-e29b-41d4-a716-446655440000
+        version:
+          type: string
+          example: v1.0
+        event:
+          type: string
+          enum: [aimbom-requested, updated-aimbom-requested]
+        sources:
+          type: object
+          description: The 7 signed report IDs this AI-MBOM is built from
+          example:
+            risk_report: 6ae735e37ceea4671026265d
+            assessment_report: 6ae75cd852aa8e2a2d63c1a2
+        status:
+          type: string
+          enum: [pending, completed, deprecated, cancelled, decommissioned]
+        aimbom_file_id:
+          type: string
+          nullable: true
+          description: The AI-MBOM file uploaded by STRAE (SAP/ai-mbom)
+        requestedBy:
+          type: string
+        cancelReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
     Error:
       type: object
       properties:
@@ -711,6 +749,8 @@ paths:
         description: |
           Fetches the latest signed reports for this model version and publishes a Kafka event
           to the `strae` topic (`aimbom-requested`, or `updated-aimbom-requested` if an AI-MBOM already exists).
+          All 7 reports are required. If no report is newer than the current AI-MBOM, nothing is published.
+          Only one generation per model version can be pending at a time.
         security:
           - bearerAuth: []
         parameters:
@@ -728,11 +768,69 @@ paths:
             example: v1.0
         responses:
           '200':
-            description: AI-MBOM generation requested — Kafka event published to strae topic
-          '404':
-            description: Model, version or no reports found
+            description: |
+              AI-MBOM generation requested (returns `aimbom_id`),
+              or `up_to_date: true` if no report is newer than the current AI-MBOM (nothing published)
           '401':
             description: No token provided
+          '404':
+            description: Model or version not found, or required reports missing (listed in `missing`)
+            content:
+              application/json:
+                example:
+                  message: 'Cannot generate AI-MBOM: required reports are missing'
+                  missing: [defence_report, gadgets_report]
+          '409':
+            description: |
+              Generation already in progress; or the model changed (a new model version is required);
+              or a new AI-MBOM version needs a new assessment and the updated risk report (see `changed`)
+
+  /models/{uuid}/versions/{version}/aimbom/cancel:
+      post:
+        tags: [Models]
+        summary: Cancel a pending AI-MBOM generation
+        description: Releases a stuck pending AI-MBOM (e.g. STRAE failed) so a new one can be requested.
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: uuid
+            in: path
+            required: true
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          - name: version
+            in: path
+            required: true
+            schema:
+              type: string
+            example: v1.0
+        requestBody:
+          required: false
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reason:
+                    type: string
+                    example: 'STRAE error: invalid defence report'
+        responses:
+          '200':
+            description: Pending AI-MBOM cancelled
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                    aimbom:
+                      $ref: '#/components/schemas/Aimbom'
+          '401':
+            description: No token provided
+          '404':
+            description: No pending AI-MBOM for this model version
 
   # ── Files ────────────────────────────────────────────────────
   /files/upload:

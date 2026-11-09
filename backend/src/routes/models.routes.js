@@ -12,7 +12,8 @@ import {
   getReports,
   getReportsAll,
   generateAIMBOM,
-  getLatestReportsForVersion
+  getLatestReportsForVersion,
+  cancelAIMBOM
 } from '../controllers/model.controller.js'
 
 const router = Router()
@@ -32,5 +33,6 @@ router.post('/:uuid/versions',                                requireAuth, addVe
 router.patch('/:uuid/versions/:version/requirements-url',     requireAuth, updateRequirementsUrl)
 // router.patch('/:uuid/versions/:version/security',             requireAuth, updateSecurityData)
 router.post('/:uuid/versions/:version/aimbom',                requireAuth, generateAIMBOM)  
+router.post('/:uuid/versions/:version/aimbom/cancel', requireAuth, cancelAIMBOM)
 
 export default router

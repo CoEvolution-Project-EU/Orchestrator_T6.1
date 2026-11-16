@@ -22,6 +22,7 @@ const REPORT_FIELDS = {
   'euaiact':                 'euaiact_reports',
   'datasets':                'datasets_reports',
   'aimbom':                  'ai_mbom',
+  'vulnerability':           'vulnerability_reports',
   'user-assessment':         'user_assessments',
   'user-defence':            'user_defences',
   'user-euaiact':            'user_euaiact',                     // NEW
@@ -50,6 +51,12 @@ const LATEST_REPORTS = {
   datasets_report:    'datasets_reports',
   aimbom_report:      'ai_mbom',
 }
+
+// ── AIMBOM update rules ───────────────────────────────────────
+// Reports allowed to change for a new AIMBOM version (anything else → new model version)
+const UPDATE_TYPES  = ['assessment_report', 'risk_report', 'gadgets_report']
+// Reports that can START a new AIMBOM version
+const TRIGGER_TYPES = ['assessment_report', 'gadgets_report']
 
 // Latest file (by createdAt) from a versioning array, or null
 const getLatest = async (fileIds) => {
@@ -481,22 +488,20 @@ const generateAIMBOM = async (req, res) => {
       })
     }
     
-    // ── STEP 3b: only assessment + risk may change for a new AIMBOM version ─
+    // ── STEP 3b: only assessment, risk and gadgets may change for a new AIMBOM version ─
     // Any other report changing means the MODEL changed → it needs a new model version
-    const UPDATE_TYPES  = ['assessment_report', 'risk_report' , 'gadgets_report' ]
-    const changedTypes  = Object.keys(changedReports)
-    const otherChanges  = changedTypes.filter(type => !UPDATE_TYPES.includes(type))
+    const changedTypes = Object.keys(changedReports)
+    const otherChanges = changedTypes.filter(type => !UPDATE_TYPES.includes(type))
 
     if (otherChanges.length > 0) {
       return res.status(409).json({
         message: 'These reports changed after the current AI-MBOM, which means the model changed. Register a new model version and generate its AI-MBOM there.',
-        changed: otherChanges,          // e.g. ["defence_report", "gadgets_report"]
+        changed: otherChanges,          // e.g. ["defence_report", "datasets_report"]
       })
     }
 
-    // ── STEP 3c: a new AIMBOM version needs a trigger (new assessment or gadgets) AND the updated risk report ─
-    const TRIGGER_TYPES = ['assessment_report', 'gadgets_report']
-    const triggers      = changedTypes.filter(type => TRIGGER_TYPES.includes(type))
+    // ── STEP 3c: something must START the update: a new assessment or a new gadgets report ─
+    const triggers = changedTypes.filter(type => TRIGGER_TYPES.includes(type))
 
     if (triggers.length === 0) {
       return res.status(409).json({
@@ -505,9 +510,10 @@ const generateAIMBOM = async (req, res) => {
       })
     }
 
-    if (!changedReports.risk_report) {
+    // ── STEP 3d: a new assessment needs its updated risk report (gadgets does not) ─
+    if (changedReports.assessment_report && !changedReports.risk_report) {
       return res.status(409).json({
-        message: `New ${triggers.join(' and ')} found, but the updated risk report is not available yet. Wait for RAGRE (and STRAE signing), then try again.`,
+        message: 'New assessment found, but the updated risk report is not available yet. Wait for RAGRE (and STRAE signing), then try again.',
         changed: changedTypes,
       })
     }

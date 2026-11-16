@@ -98,6 +98,11 @@ components:
           items:
             type: string
           default: []
+        vulnerability_reports:
+          type: array
+          items:
+            type: string
+          default: []
         datasets_reports:
           type: array
           items:
@@ -426,7 +431,7 @@ paths:
             required: true
             schema:
               type: string
-              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence, user-euaiact, risk-pending, assessment-pending, defence-pending, gadgets-pending, aimodelinfo-pending, euaiact-pending, datasets-pending, user-assessment-pending, user-defence-pending, user-euaiact-pending]
+              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, vulnerability, user-assessment, user-defence, user-euaiact, risk-pending, assessment-pending, defence-pending, gadgets-pending, aimodelinfo-pending, euaiact-pending, datasets-pending, user-assessment-pending, user-defence-pending, user-euaiact-pending]
             example: aimbom
             description: Report type — required
           - name: owner
@@ -733,6 +738,7 @@ paths:
           - euaiact         → euaiact_reports[]
           - datasets        → datasets_reports[]
           - aimbom          → ai_mbom[]
+          - vulnerability   → vulnerability_reports[]
           - user-assessment → user_assessments[]
           - user-defence    → user_defences[]
           - user-euaiact    → user_euaiact[]
@@ -755,7 +761,7 @@ paths:
             required: true
             schema:
               type: string
-              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, user-assessment, user-defence, user-euaiact, risk-pending, assessment-pending, defence-pending, gadgets-pending, aimodelinfo-pending, euaiact-pending, datasets-pending, user-assessment-pending, user-defence-pending, user-euaiact-pending]
+              enum: [requirements, trusted-model, risk, assessment, defence, gadgets, aimodelinfo, euaiact, datasets, aimbom, vulnerability, user-assessment, user-defence, user-euaiact, risk-pending, assessment-pending, defence-pending, gadgets-pending, aimodelinfo-pending, euaiact-pending, datasets-pending, user-assessment-pending, user-defence-pending, user-euaiact-pending]
         responses:
           '200':
             description: List of report files

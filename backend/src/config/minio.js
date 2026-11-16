@@ -51,7 +51,7 @@ export function getPool(poolName) {
 //create bucket if it doesnt exist for each pool
 export async function initMinIO() {
   const buckets = {
-    SAP:   ['ai-mbom'],
+    SAP:   ['ai-mbom', 'vulnerability-reports'],
     RP:    ['risk-reports','assessment-reports','defence-reports','user-assessments','user-defences','user-euaiact','gadgets-reports','aimodelinfo-reports','euaiact-reports','datasets-reports',
       'risk-reports-pending','assessment-reports-pending','defence-reports-pending','user-assessments-pending','user-defences-pending','user-euaiact-pending','gadgets-reports-pending','aimodelinfo-reports-pending','euaiact-reports-pending','datasets-reports-pending'],
     TRP:   ['trusted-data', 'model-requirements','trusted-models','avi-data','avl-data','siemens-data'],

@@ -49,6 +49,7 @@ const versioningSchema = new Schema(
          type: [String], 
          default: [] 
         },
+      vulnerability_reports: { type: [String], default: [] },
       user_assessments: { type: [String], default: [] },   
       user_defences:    { type: [String], default: [] }, 
       user_euaiact: { type: [String], default: [] }, 

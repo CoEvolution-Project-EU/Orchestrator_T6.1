@@ -44,6 +44,7 @@ const aimbomSchema = new Schema(
 
     // Decommissioning (SRME — future)
     decommissionedAt:   { type: Date,   default: null },
+    decommissionedBy:   { type: String, default: null },  
     decommissionReason: { type: String, default: null },
   },
   { timestamps: true }

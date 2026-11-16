@@ -436,18 +436,8 @@ const listFiles = async (req, res) => {
 // ── Delete a file ─────────────────────────────────────────────
 // DELETE /api/v1/files/:id
 const deleteFile = async (req, res) => {
-  try {
-    const doc = await File.findById(req.params.id)
-    if (!doc) return res.status(404).json({ message: 'File not found' })
-
-    const client = getPool(doc.pool)    // ← fix: was minioPools[doc.pool]
-    await client.removeObject(doc.bucket, doc.objectKey)
-
-    await File.findByIdAndDelete(req.params.id)
-    res.status(200).json({ message: 'File deleted successfully' })
-  } catch (error) {
-    res.status(500).json({ message: 'Delete failed', error: error.message })
-  }
+  const result = await removeFiles([req.params.id])
+  res.status(200).json(result)
 }
 
 export {

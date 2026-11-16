@@ -12,8 +12,11 @@ import {
   getReports,
   getReportsAll,
   generateAIMBOM,
-  getLatestReportsForVersion,
-  cancelAIMBOM
+  getAIMBOM,
+  cancelAIMBOM,
+  decommissionAIMBOM,
+  deleteVersion,
+  getAIMBOMByFileId
 } from '../controllers/model.controller.js'
 
 const router = Router()
@@ -24,7 +27,7 @@ router.get('/',      getAllModels)
 router.get('/reports', getReportsAll)
 router.get('/:uuid', getModelByUUID)
 router.get('/:uuid/versions/:version/reports', getReports)
-router.get('/:uuid/versions/:version/latest', getLatestReportsForVersion)
+router.get('/:uuid/versions/:version/aimbom', getAIMBOM)
 
 
 // Protected — require Keycloak token
@@ -34,5 +37,8 @@ router.patch('/:uuid/versions/:version/requirements-url',     requireAuth, updat
 // router.patch('/:uuid/versions/:version/security',             requireAuth, updateSecurityData)
 router.post('/:uuid/versions/:version/aimbom',                requireAuth, generateAIMBOM)  
 router.post('/:uuid/versions/:version/aimbom/cancel', requireAuth, cancelAIMBOM)
+router.post('/:uuid/versions/:version/aimbom/decommission', requireAuth, decommissionAIMBOM)
+router.delete('/:uuid/versions/:version', requireAuth, deleteVersion)
+router.get('/aimboms/file/:file_id', getAIMBOMByFileId)
 
 export default router

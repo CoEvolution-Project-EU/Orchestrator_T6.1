@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Image and Deploy
 
 on:
   push:
@@ -50,3 +50,25 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}  # only push on main, not PR
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  # ── NEW: deploy to the ICCS cluster ─────────────────────────
+  deploy:
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: coevolution-runner          # the ARC runner set inside the cluster
+    concurrency:
+      group: deploy-orchestrator
+      cancel-in-progress: false
+
+    steps:
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Deploy the new image
+        run: |
+          IMAGE="ghcr.io/${{ env.IMAGE_NAME }}:sha-${GITHUB_SHA::7}"
+          echo "Deploying $IMAGE"
+          kubectl -n default set image deployment/backend backend="$IMAGE"
+
+      - name: Wait until the new pod is ready
+        run: kubectl -n default rollout status deployment/backend --timeout=180s

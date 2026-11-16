@@ -1,9 +1,14 @@
 // src/controllers/model.controller.js
+import mongoose from 'mongoose'
 import { Model } from '../models/models.model.js'
 import { File } from '../models/file.model.js'
 import { Aimbom } from '../models/aimbom.model.js'
 import { publishEvent } from '../config/kafka.js'
+import { removeFiles } from '../utils/fileCleanup.js'
 
+
+const DECOMMISSION_ROLE = 'aimbom-revoker'   // Keycloak realm role held only by SRME
+const ADMIN_ROLE = 'administrator'   // Keycloak realm role: may delete any model
 
 // ── Report type → versioning array (shared by getReports + getReportsAll) ─
 const REPORT_FIELDS = {
@@ -65,15 +70,20 @@ const buildFileInfo = (doc) => {
   }
 }
 
-// Latest signed file of every type for one model version
-const getLatestReports = async (v) => {
+// Load the 7 source files + the AIMBOM file of an AIMBOM record (ONE query)
+// Returns the same keys as sources, plus aimbom_report
+const loadAimbomFiles = async (aimbom) => {
+  const ids   = [...Object.values(aimbom.sources), aimbom.aimbom_file_id].filter(Boolean)
+  const files = await File.find({ _id: { $in: ids } })
+  const byId  = new Map(files.map(f => [f._id.toString(), f]))
+
   const reports = {}
-  for (const [key, field] of Object.entries(LATEST_REPORTS)) {
-    reports[key] = buildFileInfo(await getLatest(v[field]))
+  for (const [key, id] of Object.entries(aimbom.sources)) {
+    reports[key] = buildFileInfo(byId.get(id.toString()))
   }
+  reports.aimbom_report = buildFileInfo(byId.get(aimbom.aimbom_file_id?.toString()))
   return reports
 }
-
 
 // Create a pending AIMBOM record.
 // Returns null if this model version already has a pending one.
@@ -84,6 +94,28 @@ const createPendingAimbom = async (data) => {
     if (error.code === 11000) return null   // duplicate key → the partial unique index said "already pending"
     throw error                             // any other error → let the controller's catch handle it
   }
+}
+
+// Owner of the model, or a hub admin
+const canDelete = (req, model) =>
+  req.user?.username === model.owner || req.user?.roles?.includes(ADMIN_ROLE)
+
+// Every file ID stored in ANY array of this version (final, pending, user, AIMBOM, trusted model...)
+const collectVersionFileIds = (v) => {
+  const fields = [...new Set(Object.values(REPORT_FIELDS))]
+  return fields.flatMap(field => v[field] || [])
+}
+
+// Delete everything of one version. Does NOT remove the version entry itself.
+const deleteVersionData = async (uuid, v) => {
+  // 1. Files: MinIO + File documents
+  const { deleted, failed } = await removeFiles(collectVersionFileIds(v))
+  if (failed.length > 0) return { ok: false, deleted, failed }   // stop: keep the index for a retry
+
+  // 2. AIMBOM lifecycle records of this version
+  const { deletedCount } = await Aimbom.deleteMany({ model_uuid: uuid, version: v.version })
+
+  return { ok: true, files_deleted: deleted, aimboms_deleted: deletedCount }
 }
 
 // ── Register a model ──────────────────────────────────────────
@@ -558,9 +590,9 @@ const cancelAIMBOM = async (req, res) => {
 }
 
 
-// GET /api/v1/models/:uuid/versions/:version/latest
-// Latest SIGNED report of each type + latest AIMBOM
-const getLatestReportsForVersion = async (req, res) => {
+// GET /api/v1/models/:uuid/versions/:version/aimbom
+// The valid (completed) AIMBOM + the exact reports it was generated from
+const getAIMBOM = async (req, res) => {
   try {
     const { uuid, version } = req.params
 
@@ -570,9 +602,27 @@ const getLatestReportsForVersion = async (req, res) => {
     const v = model.versioning.find(v => v.version === version)
     if (!v) return res.status(404).json({ message: 'Version not found' })
 
-    const reports = await getLatestReports(v)
+    // 1. The valid AIMBOM of this version
+    const aimbom = await Aimbom.findOne({ model_uuid: uuid, version, status: 'completed' })
+      .sort({ completedAt: -1 })
+      .lean()
 
-    // which evidence reports are still missing (AIMBOM itself is not "evidence")
+    if (!aimbom) {
+      return res.status(404).json({ message: `No valid AI-MBOM for model ${uuid} version ${version}` })
+    }
+
+    // 2. Load the 7 sources + the AIMBOM file in ONE query
+    const ids   = [...Object.values(aimbom.sources), aimbom.aimbom_file_id].filter(Boolean)
+    const files = await File.find({ _id: { $in: ids } })
+    const byId  = new Map(files.map(f => [f._id.toString(), f]))
+
+    // 3. Same response keys as before
+    const reports = {}
+    for (const [key, id] of Object.entries(aimbom.sources)) {
+      reports[key] = buildFileInfo(byId.get(id.toString()))
+    }
+    reports.aimbom_report = buildFileInfo(byId.get(aimbom.aimbom_file_id?.toString()))
+
     const missing = Object.keys(reports)
       .filter(key => key !== 'aimbom_report' && !reports[key])
 
@@ -583,6 +633,130 @@ const getLatestReportsForVersion = async (req, res) => {
       trusted:    v.trusted,
       reports,
       missing,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+// GET /api/v1/models/aimboms/file/:file_id
+// The AIMBOM record behind an AIMBOM file: lifecycle, status, sources
+const getAIMBOMByFileId = async (req, res) => {
+  try {
+    const { file_id } = req.params
+
+    if (!mongoose.isValidObjectId(file_id)) {
+      return res.status(400).json({ message: 'file_id is not a valid file ID' })
+    }
+
+    const aimbom = await Aimbom.findOne({ aimbom_file_id: file_id })
+      .select('-_id -__v')
+      .lean()
+
+    if (!aimbom) return res.status(404).json({ message: 'No AI-MBOM record for this file' })
+
+    const files = await loadAimbomFiles(aimbom)
+    const { aimbom_report, ...sources } = files
+
+    res.status(200).json({
+      ...aimbom,
+      sources,
+      aimbom_file: aimbom_report,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+
+// POST /api/v1/models/:uuid/versions/:version/aimbom/decommission
+// SRME marks the valid AIMBOM of a model version as no longer valid
+const decommissionAIMBOM = async (req, res) => {
+  try {
+    const { uuid, version } = req.params
+    const { reason } = req.body || {}
+
+    // 1. Only SRME may decommission
+    if (!req.user?.roles?.includes(DECOMMISSION_ROLE)) {
+      return res.status(403).json({ message: 'Only SRME can decommission an AI-MBOM' })
+    }
+
+    // 2. Find the valid (completed) AIMBOM AND decommission it — one atomic operation
+    const aimbom = await Aimbom.findOneAndUpdate(
+      { model_uuid: uuid, version, status: 'completed' },
+      {
+        $set: {
+          status:             'decommissioned',
+          decommissionedAt:   new Date(),
+          decommissionedBy:   req.user?.username || 'backend',
+          decommissionReason: reason || null,
+        },
+      },
+      { returnDocument: 'after' }
+    )
+
+    // 3. Nothing valid found
+    if (!aimbom) {
+      // Already decommissioned? → answer OK, so an SRME retry is harmless
+      const already = await Aimbom.findOne({ model_uuid: uuid, version, status: 'decommissioned' })
+        .sort({ decommissionedAt: -1 })
+      if (already) {
+        return res.status(200).json({ message: 'AI-MBOM already decommissioned', aimbom: already })
+      }
+      return res.status(404).json({ message: `No valid AI-MBOM for model ${uuid} version ${version}` })
+    }
+
+    res.status(200).json({
+      message: 'AI-MBOM decommissioned — a reassessment is required',
+      aimbom,
+    })
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message })
+  }
+}
+
+// DELETE /api/v1/models/:uuid/versions/:version?force=true
+// Deletes a version and EVERYTHING that belongs to it
+const deleteVersion = async (req, res) => {
+  try {
+    const { uuid, version } = req.params
+    const force = req.query.force === 'true'
+
+    const model = await Model.findOne({ model_uuid: uuid })
+    if (!model) return res.status(404).json({ message: 'Model not found' })
+
+    // 1. Only the owner or a hub admin
+    if (!canDelete(req, model)) {
+      return res.status(403).json({ message: 'Only the model owner or an admin can delete this version' })
+    }
+
+    const v = model.versioning.find(v => v.version === version)
+    if (!v) return res.status(404).json({ message: 'Version not found' })
+
+    // 2. A trusted version needs an explicit force=true
+    if (v.trusted && !force) {
+      return res.status(409).json({
+        message: 'This version is trusted. Its evidence and AI-MBOM will be lost. Repeat with ?force=true to confirm.',
+      })
+    }
+
+    // 3. Files + AIMBOM records
+    const result = await deleteVersionData(uuid, v)
+    if (!result.ok) {
+      return res.status(500).json({
+        message: 'Some files could not be deleted. The version was kept, so repeat the request to retry.',
+        files_deleted: result.deleted,
+        failed:        result.failed,
+      })
+    }
+
+    // 4. LAST: remove the version entry itself (atomic)
+    await Model.updateOne({ model_uuid: uuid }, { $pull: { versioning: { version } } })
+
+    res.status(200).json({
+      message:         `Version ${version} of model ${uuid} deleted`,
+      files_deleted:   result.files_deleted,
+      aimboms_deleted: result.aimboms_deleted,
     })
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message })
@@ -600,8 +774,11 @@ export {
   getReports,
   getReportsAll,
   generateAIMBOM,
-  getLatestReportsForVersion,
-  cancelAIMBOM
+  getAIMBOM,
+  cancelAIMBOM,
+  decommissionAIMBOM,
+  deleteVersion,
+  getAIMBOMByFileId
 }
 
 

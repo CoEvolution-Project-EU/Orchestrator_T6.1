@@ -339,6 +339,16 @@ components:
         cancelReason:
           type: string
           nullable: true
+        decommissionedAt:
+          type: string
+          format: date-time
+          nullable: true
+        decommissionedBy:
+          type: string
+          nullable: true
+        decommissionReason:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -622,6 +632,90 @@ paths:
           description: Model not found
 
 
+  /models/{uuid}/versions/{version}:
+      delete:
+        tags: [Models]
+        summary: Delete a model version and everything that belongs to it
+        description: |
+          Deletes all files of this version (MinIO objects + File documents: reports, pending, user files, AI-MBOMs...),
+          its AI-MBOM lifecycle records, and finally the version entry itself.
+          Only the model owner or a user with the Keycloak realm role `administrator` may call this.
+          A trusted version requires `?force=true` to confirm.
+          If some files cannot be deleted, the version entry is kept so the request can be repeated.
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: uuid
+            in: path
+            required: true
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          - name: version
+            in: path
+            required: true
+            schema:
+              type: string
+            example: v1.0
+          - name: force
+            in: query
+            required: false
+            description: Must be `true` to delete a trusted version
+            schema:
+              type: boolean
+              default: false
+        responses:
+          '200':
+            description: Version deleted
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Version v1.0 of model 550e8400-e29b-41d4-a716-446655440000 deleted
+                    files_deleted:
+                      type: integer
+                      example: 12
+                    aimboms_deleted:
+                      type: integer
+                      example: 2
+          '401':
+            description: No token provided
+          '403':
+            description: Only the model owner or an admin can delete this version
+          '404':
+            description: Model or version not found
+          '409':
+            description: The version is trusted — repeat with `?force=true` to confirm
+          '500':
+            description: |
+              Some files could not be deleted (the version was kept — repeat to retry),
+              or server error
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: Some files could not be deleted. The version was kept, so repeat the request to retry.
+                    files_deleted:
+                      type: integer
+                      example: 10
+                    failed:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          _id:
+                            type: string
+                          error:
+                            type: string
+                    error:
+                      type: string
+
   /models/{uuid}/versions/{version}/reports:
       get:
         tags: [Models]
@@ -694,13 +788,15 @@ paths:
           '404':
             description: Model or version not found
 
-  /models/{uuid}/versions/{version}/latest:
+  /models/{uuid}/versions/{version}/aimbom:
       get:
         tags: [Models]
-        summary: Get latest signed reports + latest AI-MBOM
+        summary: Get the valid AI-MBOM and the reports it was built from
         description: |
-          Returns the latest signed file of each report type and the latest AI-MBOM (null if none).
-          `missing` lists the report types that do not exist yet.
+          If a valid (`completed`) AI-MBOM exists for this model version, returns the exact signed reports
+          it was generated from (its `sources`) plus the AI-MBOM file in `aimbom_report`.
+          Otherwise, returns the latest signed file of each report type and `aimbom_report: null`.
+          `missing` lists the report types that do not exist yet. Response shape is the same in both cases.
         parameters:
           - name: uuid
             in: path
@@ -716,7 +812,7 @@ paths:
             example: v1.0
         responses:
           '200':
-            description: Latest reports
+            description: AI-MBOM sources, or latest signed reports if there is no valid AI-MBOM
             content:
               application/json:
                 example:
@@ -741,8 +837,6 @@ paths:
                   missing: [assessment_report, defence_report, gadgets_report, aimodelinfo_report, euaiact_report, datasets_report]
           '404':
             description: Model or version not found
-
-  /models/{uuid}/versions/{version}/aimbom:
       post:
         tags: [Models]
         summary: Generate AI-MBOM
@@ -831,6 +925,125 @@ paths:
             description: No token provided
           '404':
             description: No pending AI-MBOM for this model version
+
+  /models/{uuid}/versions/{version}/aimbom/decommission:
+      post:
+        tags: [Models]
+        summary: Decommission the valid AI-MBOM of a model version
+        description: |
+          SRME marks the valid (`completed`) AI-MBOM of a model version as `decommissioned` — a reassessment is required.
+          Only users with the Keycloak realm role `aimbom-revoker` (SRME) may call this.
+          Idempotent: if the AI-MBOM is already decommissioned, returns 200 with the existing record.
+        security:
+          - bearerAuth: []
+        parameters:
+          - name: uuid
+            in: path
+            required: true
+            schema:
+              type: string
+            example: 550e8400-e29b-41d4-a716-446655440000
+          - name: version
+            in: path
+            required: true
+            schema:
+              type: string
+            example: v1.0
+        requestBody:
+          required: false
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reason:
+                    type: string
+                    example: 'New vulnerability found — reassessment required'
+        responses:
+          '200':
+            description: AI-MBOM decommissioned (or already decommissioned)
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    message:
+                      type: string
+                      example: 'AI-MBOM decommissioned — a reassessment is required'
+                    aimbom:
+                      $ref: '#/components/schemas/Aimbom'
+          '401':
+            description: No token provided
+          '403':
+            description: Only SRME (role `aimbom-revoker`) can decommission an AI-MBOM
+          '404':
+            description: No valid AI-MBOM for this model version
+          '500':
+            description: Server error
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
+
+  /models/aimboms/file/{file_id}:
+      get:
+        tags: [Models]
+        summary: Get an AI-MBOM record by its AI-MBOM file ID
+        description: |
+          Finds the AI-MBOM record whose uploaded AI-MBOM file (`aimbom_file_id`) is `file_id`, and returns it
+          (any status) with its source reports and the AI-MBOM file resolved to file info
+          (filename, bucket, download URL) instead of raw file IDs.
+          `sources` and `aimbom_file` entries are `null` if the file no longer exists.
+        parameters:
+          - name: file_id
+            in: path
+            required: true
+            description: MongoDB ObjectId of the AI-MBOM file (SAP/ai-mbom)
+            schema:
+              type: string
+            example: 6ae7700052aa8e2a2d63c1ff
+        responses:
+          '200':
+            description: The AI-MBOM with its files
+            content:
+              application/json:
+                example:
+                  aimbom_id: 3f2b8c1e-7d4a-4c2e-9b1f-1a2b3c4d5e6f
+                  model_uuid: 550e8400-e29b-41d4-a716-446655440000
+                  version: v1.0
+                  event: aimbom-requested
+                  status: completed
+                  requestedBy: alice
+                  createdAt: '2026-11-01T15:38:00.113Z'
+                  sources:
+                    risk_report:
+                      _id: 6ae735e37ceea4671026265d
+                      bucket: risk-reports
+                      filename: risk-report.json
+                      download_url: https://aegis.coevolution-project.eu/api/v1/files/download/6ae735e37ceea4671026265d
+                      createdAt: '2026-11-01T15:38:00.113Z'
+                    assessment_report:
+                      _id: 6ae75cd852aa8e2a2d63c1a2
+                      bucket: assessment-reports
+                      filename: assessment-report.json
+                      download_url: https://aegis.coevolution-project.eu/api/v1/files/download/6ae75cd852aa8e2a2d63c1a2
+                      createdAt: '2026-11-01T15:40:00.000Z'
+                  aimbom_file:
+                    _id: 6ae7700052aa8e2a2d63c1ff
+                    bucket: ai-mbom
+                    filename: ai-mbom.json
+                    download_url: https://aegis.coevolution-project.eu/api/v1/files/download/6ae7700052aa8e2a2d63c1ff
+                    createdAt: '2026-11-01T16:00:00.000Z'
+          '400':
+            description: file_id is not a valid file ID
+          '404':
+            description: No AI-MBOM record for this file
+          '500':
+            description: Server error
+            content:
+              application/json:
+                schema:
+                  $ref: '#/components/schemas/Error'
 
   # ── Files ────────────────────────────────────────────────────
   /files/upload:
